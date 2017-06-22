@@ -1,5 +1,5 @@
 
-0.1
+0.1b0
 ---
 
 - add Package class
