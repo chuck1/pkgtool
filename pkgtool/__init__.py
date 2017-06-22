@@ -423,6 +423,8 @@ class Package(object):
                 print('this branch is ahead of v{}'.format(self.current_version().to_string()))
                 if input_yn('do you want to update the version number?', 'n'):
                     self.input_version_change()
+
+                    self.upload_wheel()
             
             # if not clean or at downstream commit, change version, commit, push, and upload
         except Exception as e:
@@ -498,6 +500,9 @@ def version(pkg, args):
 def wheel(pkg, args):
     pkg.build_wheel()
 
+def upload(pkg, args):
+    pkg.upload_wheel()
+
 def main(argv):
     
     parser = argparse.ArgumentParser()
@@ -516,6 +521,9 @@ def main(argv):
 
     parser_wheel = subparsers.add_parser('wheel')
     parser_wheel.set_defaults(func=wheel)
+
+    parser_upload = subparsers.add_parser('upload')
+    parser_upload.set_defaults(func=upload)
     
     args = parser.parse_args()
     
