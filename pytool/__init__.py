@@ -21,6 +21,17 @@ class Option(object):
     def __call__(self):
         return self.c()
 
+def input_yn(s, default):
+    while True:
+        s = input('{} (y/n) [{}]:'.format(s, default))
+        s = s.tolower()
+        if s == 'y':
+            return True
+        elif s == 'n':
+            return False
+        else:
+            print('invalid entry')
+
 class Version(object):
     class PreRelease(object):
         def __init__(self, s, n):
@@ -328,7 +339,6 @@ class Package(object):
             b = b.strip()
             lines = b.split('\n')
 
-
         pipfile = self.read_pipfile()
         
         print('local deps')
@@ -409,7 +419,9 @@ class Package(object):
     
             # if clean, compare to version tag matching version in source
             if self.compare_ancestor_version():
-                self.input_version_change()
+                print('this branch is ahead of v{}'.format(self.current_version().to_string()))
+                if input_yn('do you want to update the version number?'):
+                    self.input_version_change()
             
             # if not clean or at downstream commit, change version, commit, push, and upload
         except Exception as e:
@@ -425,8 +437,17 @@ class Package(object):
             for l in r.stdout.split(b'\n'):
                 if b'git+' in l: continue
                 f.write(l+b'\n')
-    
+
+    def assert_head_at_version_tag(self):
+        v = self.current_version()
+        c0 = v.get_git_commit()
+        c1 = self.get_git_commit_HEAD()
+        if not (c0 == c1):
+            raise Exception('HEAD is not at v{}'.format(v.to_string()))
+
     def build_wheel(self):
+        self.assert_head_at_version_tag()
+
         self.run('mkdir -p dist'.split(' '))
         self.run('rm -f dist/*whl'.split(' '))
         self.run('python3 setup.py bdist_wheel'.split(' '))
