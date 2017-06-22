@@ -1,9 +1,9 @@
 import os
 from setuptools import setup
 
-import pytool
+import pkgtool
 
-pkg = pytool.Package(os.getcwd())
+pkg = pkgtool.Package(os.getcwd())
 
 setup(**pkg.setup_args())
 
