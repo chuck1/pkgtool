@@ -198,7 +198,8 @@ def commented_lines(b):
 class Package(object):
     def __init__(self, d):
         self.d = d
-        self.pkg = os.path.split(self.d)[1]
+        self.config = self.read_config()
+        self.pkg = self.config['name']
 
     def run(self, args, cwd=None):
         if cwd is None: cwd = self.d
@@ -457,10 +458,12 @@ class Package(object):
         
         self.run('twine upload dist/*whl'.split(' '))
 
-    def setup_args(self):
-    
+    def read_config(self):
         with open(os.path.join(self.d, 'Pytool')) as f:
             c = toml.loads(f.read())
+        return c
+    def setup_args(self):
+        c = self.read_config()
         
         with open(os.path.join(self.d, c['name'], '__init__.py')) as f:
             version = re.findall("^__version__ = '(.*)'", f.read())[0]
