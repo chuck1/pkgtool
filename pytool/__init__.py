@@ -24,7 +24,7 @@ class Option(object):
 def input_yn(s, default):
     while True:
         s = input('{} (y/n) [{}]:'.format(s, default))
-        s = s.tolower()
+        s = s.lower()
         if s == 'y':
             return True
         elif s == 'n':
