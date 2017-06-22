@@ -297,10 +297,14 @@ class Package(object):
         return b'\n'.join(lines)
 
     def current_version(self):
-        with open(os.path.join(self.d, self.pkg, '__init__.py')) as f:
+        fn = os.path.join(self.d, self.pkg, '__init__.py')
+        with open(fn) as f:
             l = f.readlines()
-
-        v = VersionProject.from_string(self, l[0])
+        try:
+            v = VersionProject.from_string(self, l[0])
+        except:
+            raise Exception('unable to parse version from {}'.format(fn))
+        
         return v
 
     def compare_ancestor_version(self):
@@ -530,7 +534,11 @@ def main(argv):
     # TODO use args to possible use different directory
     pkg = Package(os.getcwd())
 
-    args.func(pkg, args)
+    try:
+        args.func(pkg, args)
+    except Exception as e:
+        print(e)
+        sys.exit(1)
     
     
     
