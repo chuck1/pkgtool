@@ -5,9 +5,14 @@ author = "Charles Rymal"
 author_email = "charlesrymal@gmail.com"
 license = "MIT"
 
+scripts = ['bin/pytool']
+
 packages = [
 	"pytool",
 	"pytool.tests",
 ]
+
+[package_data]
+'' = ['*.txt']
 
 
