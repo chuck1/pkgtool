@@ -212,6 +212,14 @@ class Package(object):
             raise Exception('Error in {}:\n{}\n{}'.format(repr(' '.join(args)), r.stdout.decode(), r.stderr.decode()))
         return r
     
+    def run_shell(self, args, cwd=None):
+        if cwd is None: cwd = self.d
+        print(args)
+        r = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd, shell=True)
+        if r.returncode != 0:
+            raise Exception('Error in {}:\n{}\n{}'.format(repr(' '.join(args)), r.stdout.decode(), r.stderr.decode()))
+        return r
+    
     def run2(self, args, cwd=None):
         if cwd is None: cwd = self.d
         r = subprocess.run(args, cwd=cwd)
@@ -455,14 +463,24 @@ class Package(object):
     def build_wheel(self):
         self.assert_head_at_version_tag()
 
-        self.run('mkdir -p dist'.split(' '))
-        self.run('rm -f dist/*whl'.split(' '))
-        self.run('python3 setup.py bdist_wheel'.split(' '))
+        r = self.run(('mkdir', '-p', 'dist'))
+        r = self.run_shell('rm -f dist/*')
+
+        self.run(('python3', 'setup.py', 'bdist_wheel'))
         
     def upload_wheel(self):
         self.build_wheel()
+
+        s = self.current_version().to_string()
+        l = os.listdir(os.path.join(self.d, 'dist'))
         
-        self.run('twine upload dist/*whl'.split(' '))
+        assert len(l) == 1
+        
+        f = l[0]
+        
+        assert f == (self.pkg + '-' + s + '-py3-none-any.whl')
+        
+        self.run(('twine', 'upload', 'dist/'+f))
 
     def read_config(self):
         with open(os.path.join(self.d, 'Pytool')) as f:
