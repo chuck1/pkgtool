@@ -1,15 +1,15 @@
-name = "pytool"
+name = "pkgtool"
 description = "python makefile system"
-url = "http://github.com/chuck1/pymake"
+url = "http://github.com/chuck1/pytool"
 author = "Charles Rymal"
 author_email = "charlesrymal@gmail.com"
 license = "MIT"
 
-scripts = ['bin/pytool']
+scripts = ['bin/pkgtool']
 
 packages = [
-	"pytool",
-	"pytool.tests",
+	"pkgtool",
+	"pkgtool.tests",
 ]
 
 [package_data]
