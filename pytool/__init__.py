@@ -200,9 +200,6 @@ class Package(object):
         self.d = d
         self.pkg = os.path.split(self.d)[1]
 
-        print('d  ',self.d)
-        print('pkg',self.pkg)
-
     def run(self, args, cwd=None):
         if cwd is None: cwd = self.d
         print(' '.join(args))
@@ -492,6 +489,9 @@ class Package(object):
 def commit(pkg, args):
     pkg.commit(args)
 
+def version(pkg, args):
+    print(pkg.current_version().to_string())
+
 def main(argv):
     
     parser = argparse.ArgumentParser()
@@ -504,7 +504,10 @@ def main(argv):
 
     parser_commit = subparsers.add_parser('commit')
     parser_commit.set_defaults(func=commit)
-   
+ 
+    parser_commit = subparsers.add_parser('version')
+    parser_commit.set_defaults(func=version)
+    
     args = parser.parse_args()
     
     # TODO use args to possible use different directory
