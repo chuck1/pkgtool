@@ -379,7 +379,7 @@ class Package(object):
                     Exception(str(s_lines))
             
                 self.run(('git', 'add', 'Pipfile'))
-                self.run(('git', 'commit', '-m', '\'update {} to {}\''.format(l, v_string)))
+                self.run(('git', 'commit', '-m', 'PKGTOOL update {} to {}'.format(l, v_string)))
 
     def assert_status(self, lines):
         s = set(self.git_status_lines())
@@ -404,7 +404,7 @@ class Package(object):
         self.assert_status(set((('M', fn0),)))
 
         self.run(('git', 'add', fn0))
-        self.run(('git', 'commit', '-m', '\'change version from {} to {}\''.format(v0.to_string(), v.to_string())))
+        self.run(('git', 'commit', '-m', 'PKGTOOL change version from {} to {}'.format(v0.to_string(), v.to_string())))
         self.run(('git', 'tag', 'v{}'.format(v.to_string())))
         self.run(('git', 'push', 'origin', 'v{}'.format(v.to_string())))
 

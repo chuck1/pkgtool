@@ -2,6 +2,11 @@
 next
 ----
 
+- #1 remove quotation marks around change version commit message
+
+0.1b3
+-----
+
 - add wheel command
 
 0.1b2
