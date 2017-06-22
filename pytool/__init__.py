@@ -420,7 +420,7 @@ class Package(object):
             # if clean, compare to version tag matching version in source
             if self.compare_ancestor_version():
                 print('this branch is ahead of v{}'.format(self.current_version().to_string()))
-                if input_yn('do you want to update the version number?'):
+                if input_yn('do you want to update the version number?', 'n'):
                     self.input_version_change()
             
             # if not clean or at downstream commit, change version, commit, push, and upload
