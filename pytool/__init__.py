@@ -316,6 +316,7 @@ class Package(object):
 
         # HEAD is at tag
         if (c == c1):
+            print('HEAD is at {}'.format(v.to_string()))
             return False
         else:
             print('HEAD is ahread of v{}'.format(v.to_string()))
