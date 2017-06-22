@@ -25,10 +25,13 @@ def input_yn(s, default):
     while True:
         s = input('{} (y/n) [{}]:'.format(s, default))
         s = s.lower()
+        
         if s == 'y':
             return True
         elif s == 'n':
             return False
+        elif s == '':
+            return default
         else:
             print('invalid entry')
 
@@ -420,7 +423,7 @@ class Package(object):
             # if clean, compare to version tag matching version in source
             if self.compare_ancestor_version():
                 print('this branch is ahead of v{}'.format(self.current_version().to_string()))
-                if input_yn('do you want to update the version number?', 'n'):
+                if input_yn('do you want to update the version number?', False):
                     self.input_version_change()
             
             # if not clean or at downstream commit, change version, commit, push, and upload
