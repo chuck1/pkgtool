@@ -489,8 +489,8 @@ class Package(object):
                 'license': c['license'],
                 'packages': c['packages'],
                 'zip_safe': False,
-                'scripts': c['scripts'],
-                'package_data': c['package_data'],
+                'scripts': c.get('scripts',[]),
+                'package_data': c.get('package_data',{}),
                 'install_requires': install_requires,}
         
         return kwargs
