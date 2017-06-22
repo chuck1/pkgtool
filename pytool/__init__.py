@@ -492,6 +492,9 @@ def commit(pkg, args):
 def version(pkg, args):
     print(pkg.current_version().to_string())
 
+def wheel(pkg, args):
+    pkg.build_wheel()
+
 def main(argv):
     
     parser = argparse.ArgumentParser()
@@ -505,8 +508,11 @@ def main(argv):
     parser_commit = subparsers.add_parser('commit')
     parser_commit.set_defaults(func=commit)
  
-    parser_commit = subparsers.add_parser('version')
-    parser_commit.set_defaults(func=version)
+    parser_version = subparsers.add_parser('version')
+    parser_version.set_defaults(func=version)
+
+    parser_wheel = subparsers.add_parser('wheel')
+    parser_wheel.set_defaults(func=wheel)
     
     args = parser.parse_args()
     
