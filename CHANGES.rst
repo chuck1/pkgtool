@@ -2,7 +2,7 @@
 next
 ----
 
-- 
+- add upload command
 
 0.1b4
 -----
