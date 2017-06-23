@@ -2,6 +2,11 @@
 next
 ----
 
+0.1b8
+-----
+
+- working on bugs. dealing with bug in pipenv concerning shell switching
+
 0.1b7
 -----
 

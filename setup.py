@@ -5,7 +5,8 @@ import pkgtool
 
 pkg = pkgtool.Package(os.getcwd())
 
-setup(**pkg.setup_args())
+setup(**pkg.setup_args(),
+        setup_requires=['toml','termcolor'])
 
 
 
