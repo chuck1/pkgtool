@@ -490,6 +490,9 @@ class Package(object):
             if m:
                 self.print_(repr(k), repr(v))
                 self.print_(repr(m.group(1)))
+                
+                if m.group(1) == '.':
+                    continue
 
                 d = os.path.join(self.d, m.group(1))
                 pkg = Package(d)
