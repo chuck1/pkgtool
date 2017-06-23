@@ -667,7 +667,9 @@ class Package(object):
         else:
             raise Exception()
         
-        self.run(('twine', 'upload', os.path.join('dist', wf)))
+        args = ('twine', 'upload', os.path.join('dist', wf))
+        self.print_(' '.join(args))
+        self.run(*args)
 
     def read_config(self):
         with open(os.path.join(self.d, 'Pytool')) as f:
