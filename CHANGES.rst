@@ -2,6 +2,11 @@
 next
 ----
 
+- add interactive terminal for commit
+
+0.1b5
+-----
+
 - add upload command
 
 0.1b4
