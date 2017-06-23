@@ -345,7 +345,7 @@ class Package(object):
         else:
             print('HEAD is ahread of v{}'.format(v.to_string()))
             return True
-
+    
     def pipenv_install_deps(self):
         with open(os.path.join(self.d, 'LOCAL_DEPS.txt')) as f:
             b = f.read()
@@ -371,16 +371,21 @@ class Package(object):
 
             d2 = os.path.join(d1, 'dist')
             
-            foo.run(('make', 'wheel'))
-
-            print(d1)
-            print(d2)
-            print(os.listdir(d2)[0])
+            #foo.run(('make', 'wheel'))
+            print('other package\'s root:', d1)
             print('spec = {}'.format(spec))
+            
+            wf = foo.wheel_filename()
+            if not (wf in os.listdir(d2)):
+                print('wheel {} not in {}.'.format(wf, d2))
+                print('try to build wheel...')
+            
+                foo.build_wheel()
 
-            wheel_file = os.path.join(d2, os.listdir(d2)[0])
+                if not (wf in os.listdir(d2)):
+                    raise Exception('building wheel did not produce expected wheel file...')
 
-            self.run(('pipenv', 'install', wheel_file))
+            self.run(('pipenv', 'install', os.path.join(d2, wf)))
             self.run(('pipenv', 'install', spec))
 
             s_lines = list(self.git_status_lines())
@@ -459,6 +464,10 @@ class Package(object):
         c1 = self.get_git_commit_HEAD()
         if not (c0 == c1):
             raise Exception('HEAD is not at v{}'.format(v.to_string()))
+
+    def wheel_filename(self):
+        s = self.current_version().to_string()
+        return self.pkg + '-' + s + '-py3-none-any.whl'
 
     def build_wheel(self):
         self.assert_head_at_version_tag()
