@@ -245,7 +245,7 @@ class Package(object):
 
             l = l.decode()
 
-            m = re.match('^\s(\w+)\s([\w+/\.]+)', l)
+            m = re.match('^\s(\w+)\s([\w+-/\.]+)$', l)
             
             if not m: raise Exception('failed to parse git status line: {} lines: {}'.format(repr(l), lines))
             
@@ -487,7 +487,14 @@ class Package(object):
         
         f = l[0]
         
-        assert f == (self.pkg + '-' + s + '-py3-none-any.whl')
+        wf1 = self.pkg + '-' + s + '-py3-none-any.whl'
+        wf2 = self.pkg.replace('-','_') + '-' + s + '-py3-none-any.whl'
+        if not ((f == wf1) or (f == wf2)):
+            print('not equal')
+            print(' ', f)
+            print('  {}'.format(wf1))
+            print('  {}'.format(wf2))
+            raise Exception()
         
         self.run(('twine', 'upload', 'dist/'+f))
 
