@@ -222,7 +222,11 @@ class Package(object):
         #print(r.stdout.decode())
         #print(r.stderr.decode())
         if r.returncode != 0:
-            raise Exception('Error in {}:\n{}\n{}'.format(repr(' '.join(args)), r.stdout.decode(), r.stderr.decode()))
+            if r.stdout:
+                print(r.stdout.decode())
+            if r.stderr:
+                print(r.stderr.decode())
+            raise Exception('Error in {}'.format(repr(' '.join(args))))
         return r
     
     def run_shell(self, args, cwd=None):
