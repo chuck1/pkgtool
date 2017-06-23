@@ -69,27 +69,30 @@ class Version(object):
     def remove_pre(self):
         return Version(list(self.rel))
 
-    def next(self, i):
+    def next(self, i, pre=None):
         l = list(self.rel)[:i+1]
         l[i] += 1
-        return Version(l)
+        return Version(l, pre=pre)
     
-    def next_add_pre(self, i, pre):
-        v = self.next(i)
-        v.pre = pre
-        v.suf = None
-        return v
-
-    def input_next_add_pre(self, i):
+    def input_pre(self):
         s = input('enter pre-release:')
-        
-        if not s: return self.next(i)
-
+        if not s: return None
         m = re.match('(a|b|rc)(\d+)', s)
         s = m.group(1)
         n = int(m.group(2))
+        return Version.PreRelease(s, n)
 
-        return self.next_add_pre(i, Version.PreRelease(s, n))
+    def input_next_add_pre(self, i):
+        pre = self.input_pre()
+        return self.next(i, pre)
+    
+    def add_release_level(self):
+        assert (self.pre is None) and (self.suf is None)
+        return Version(self.rel + [0])
+
+    def input_add_release_level_pre(self):
+        assert (self.pre is None) and (self.suf is None)
+        return Version(self.rel + [0], self.input_pre())
 
     def version_change_options(self):
         """
@@ -104,7 +107,11 @@ class Version(object):
 
         for i in range(len(self.rel)):
             yield Option(functools.partial(self.input_next_add_pre, i), self.next(i).to_string())
-    
+        
+        if (self.pre is None) and (self.suf is None):
+            if len(self.rel) < 3:
+                yield Option(self.input_add_release_level_pre, self.add_release_level().to_string())
+
     def prompt_change(self):
         options = list(self.version_change_options())
         
@@ -191,11 +198,8 @@ def tests_version():
     test_version('__version__ = \'1.2.3b0\'')
     test_version('__version__ = \'1.2.3dev0\'')
 
-
-
 def commented_lines(b):
     return [b'# ' + l for l in b.split(b'\n')]
-
 
 class Package(object):
     """
@@ -545,7 +549,7 @@ class Package(object):
         with open(fn, 'w') as f:
             f.write(''.join(lines))
 
-        self.assert_status(set((('M', fn0),)))
+        self.assert_status(set(((Package.FileStatus.Type.MODIFIED, False, fn0),)))
 
         self.run(('git', 'add', fn0))
         self.run(('git', 'commit', '-m', 'PKGTOOL change version from {} to {}'.format(v0.to_string(), v.to_string())))
@@ -577,8 +581,10 @@ class Package(object):
             
             # if not clean or at downstream commit, change version, commit, push, and upload
         except Exception as e:
-            print(e)
-            traceback.print_exc()
+            raise
+            #print(e)
+            #traceback.print_exc()
+            #sys.exit(1)
     
     def write_requirements(self):
         r = self.run(('pipenv', 'run', 'pip3', 'freeze'))
