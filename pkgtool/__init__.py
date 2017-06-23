@@ -644,10 +644,6 @@ class Package(object):
 
     def build_wheel(self):
         self.assert_head_at_version_tag()
-
-        r = self.run(('mkdir', '-p', 'dist'))
-        r = self.run_shell('rm -f dist/*')
-        
         args = ('python3', 'setup.py', 'bdist_wheel')
         self.print_(*args)
         self.run(args, stdout=None, stderr=None)
@@ -656,22 +652,18 @@ class Package(object):
         self.build_wheel()
 
         s = self.current_version().to_string()
-        l = os.listdir(os.path.join(self.d, 'dist'))
-        
-        assert len(l) == 1
-        
-        f = l[0]
         
         wf1 = self.pkg + '-' + s + '-py3-none-any.whl'
         wf2 = self.pkg.replace('-','_') + '-' + s + '-py3-none-any.whl'
-        if not ((f == wf1) or (f == wf2)):
-            print('not equal')
-            print(' ', f)
-            print('  {}'.format(wf1))
-            print('  {}'.format(wf2))
+        
+        if os.path.exists(os.path.join(self.d, 'dist', wf1)):
+            wf = wf1
+        elif os.path.exists(os.path.join(self.d, 'dist', wf2)):
+            wf = wf2
+        else:
             raise Exception()
         
-        self.run(('twine', 'upload', 'dist/'+f))
+        self.run(('twine', 'upload', os.path.join('dist', wf)))
 
     def read_config(self):
         with open(os.path.join(self.d, 'Pytool')) as f:
