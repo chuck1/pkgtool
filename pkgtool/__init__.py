@@ -17,6 +17,8 @@ import toml
 
 #DIR = os.getcwd()
 
+VISITED = []
+
 class Option(object):
     def __init__(self, c, s=None):
         if s is None: s = c().to_string()
@@ -583,6 +585,10 @@ class Package(object):
         self.run(('git', 'push', 'origin', 'v{}'.format(v.to_string())))
 
     def commit(self, args):
+        if self.pkg in VISITED:
+            return
+        VISITED.append(self.pkg)
+        
         self.print_('pkgtool')
 
         for pkg in self.gen_local_deps():
