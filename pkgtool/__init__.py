@@ -485,6 +485,12 @@ class Package(object):
             print('HEAD is ahread of v{}'.format(v.to_string()))
             return True
     
+    def gen_local_deps(self):
+        """
+        :rtype: generator of Package objects
+        """
+
+
     def pipenv_install_deps(self):
         with open(os.path.join(self.d, 'LOCAL_DEPS.txt')) as f:
             b = f.read()
@@ -667,6 +673,13 @@ class Package(object):
         
         return kwargs
 
+    def docs(self):
+        self.run(('make', '-C', 'docs', 'html'))
+        self.run(('make', '-C', 'docs', 'coverage'))
+        d = os.environ['LOCAL_DOCS_DIR']
+        if d:
+            self.run(('cp', '-r', 'docs/_build/html', os.path.join(d, self.pkg)))
+
 def commit(pkg, args):
     pkg.commit(args)
 
@@ -678,6 +691,9 @@ def wheel(pkg, args):
 
 def upload(pkg, args):
     pkg.upload_wheel()
+
+def docs(pkg, args):
+    pkg.docs()
 
 def main(argv):
     
@@ -700,6 +716,9 @@ def main(argv):
 
     parser_upload = subparsers.add_parser('upload')
     parser_upload.set_defaults(func=upload)
+
+    parser_docs = subparsers.add_parser('docs')
+    parser_docs.set_defaults(func=docs)
     
     args = parser.parse_args()
     
