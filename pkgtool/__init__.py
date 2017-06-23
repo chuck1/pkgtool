@@ -271,6 +271,8 @@ class Package(object):
                     yield Package.FileStatus.Type.DELETED, False, m.group(2)
                 elif m.group(1) == 'D ':
                     yield Package.FileStatus.Type.DELETED, True, m.group(2)
+                elif m.group(1) == '??':
+                    yield Package.FileStatus.Type.UNTRACKED, False, m.group(2)
                 else:
                     raise Exception('unhandled code: {}'.format(repr(m.group(1))))
 
@@ -278,6 +280,7 @@ class Package(object):
         class Type(enum.Enum):
             MODIFIED = 0
             DELETED = 1
+            UNTRACKED = 2
 
         def __init__(self, pkg, type_, staged, filename):
             self.pkg = pkg
@@ -500,10 +503,10 @@ class Package(object):
                 print('{} already in Pipfile'.format(spec))
                 continue
 
-            d2 = os.path.join(d1, 'dist')
+            d2 = os.path.join(pkg.d, 'dist')
             
             #pkg.run(('make', 'wheel'))
-            print('other package\'s root:', d1)
+            print('other package\'s root:', pkg.d)
             print('spec = {}'.format(spec))
             
             wf = pkg.wheel_filename()
@@ -527,7 +530,7 @@ class Package(object):
                     Exception(str(s_lines))
             
                 self.run(('git', 'add', 'Pipfile'))
-                self.run(('git', 'commit', '-m', 'PKGTOOL update {} to {}'.format(l, v_string)))
+                self.run(('git', 'commit', '-m', 'PKGTOOL update {} to {}'.format(pkg.pkg, v_string)))
 
     def assert_status(self, lines):
         s = set(self.git_status_lines())
