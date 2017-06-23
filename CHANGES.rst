@@ -3,6 +3,7 @@ next
 ----
 
 - add interactive terminal for commit
+- add docs command
 
 0.1b5
 -----

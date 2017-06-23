@@ -12,6 +12,7 @@ import tempfile
 import traceback
 from pprint import pprint
 
+import termcolor
 import toml
 
 #DIR = os.getcwd()
@@ -170,7 +171,7 @@ class VersionProject(Version):
         r = self.proj.run(('git', 'rev-parse', 'v'+self.to_string()))
         return r.stdout.strip()
 
-def test(s):
+def test_version(s):
     v = Version.from_string(s)
     print(v.to_string())
     for i in range(len(v.rel)):
@@ -180,15 +181,15 @@ def test(s):
         print(v.remove_sv().to_string())
     print()
 
-def tests():
-    test('__version__ = \'1\'')
-    test('__version__ = \'1a0\'')
-    test('__version__ = \'1.2\'')
-    test('__version__ = \'1.2a0\'')
-    test('__version__ = \'1.2.3\'')
-    test('__version__ = \'1.2.3a0\'')
-    test('__version__ = \'1.2.3b0\'')
-    test('__version__ = \'1.2.3dev0\'')
+def tests_version():
+    test_version('__version__ = \'1\'')
+    test_version('__version__ = \'1a0\'')
+    test_version('__version__ = \'1.2\'')
+    test_version('__version__ = \'1.2a0\'')
+    test_version('__version__ = \'1.2.3\'')
+    test_version('__version__ = \'1.2.3a0\'')
+    test_version('__version__ = \'1.2.3b0\'')
+    test_version('__version__ = \'1.2.3dev0\'')
 
 
 
@@ -196,18 +197,21 @@ def commented_lines(b):
     return [b'# ' + l for l in b.split(b'\n')]
 
 
-
-
 class Package(object):
+    """
+    Represents a python package project.
+
+    :param d: root of project
+    """
     def __init__(self, d):
         self.d = d
         self.config = self.read_config()
         self.pkg = self.config['name']
 
-    def run(self, args, cwd=None):
+    def run(self, args, cwd=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
         if cwd is None: cwd = self.d
         #print(' '.join(args))
-        r = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+        r = subprocess.run(args, stdout=stdout, stderr=stderr, cwd=cwd)
         #o, e = p.communicate()
         #print(r.stdout.decode())
         #print(r.stderr.decode())
@@ -301,24 +305,31 @@ class Package(object):
         def main(stdscr):
             curses.curs_set(0)
             # Clear screen
+            
 
             files = list(self.gen_file_status())
             if not files:
                 curses.endwin()
                 return
-
+            
+            w1 = curses.newwin(len(files), 100, 3, 0)
+            
             cursor = 0
             
             def draw():
                 stdscr.clear()
+                
+                # pacakge info
+                stdscr.addstr(0, 0, self.pkg)
 
                 # This raises ZeroDivisionError when i == 10.
                 for i, f in zip(range(len(files)), files):
-                    f.addstr(stdscr, i)
+                    f.addstr(w1, i)
             
-                stdscr.addstr(cursor, 0, '>', curses.A_STANDOUT)
+                w1.addstr(cursor, 0, '>', curses.A_STANDOUT)
         
                 stdscr.refresh()
+                w1.refresh()
         
             draw()
 
@@ -326,17 +337,17 @@ class Package(object):
                 c = stdscr.getch()
 
                 if c == curses.KEY_UP or c == 65:
-                    stdscr.addstr(cursor, 0, ' ')
+                    w1.addstr(cursor, 0, ' ')
                     cursor = (cursor + 1) % len(files)
-                    stdscr.addstr(cursor, 0, '>', curses.A_STANDOUT)
+                    w1.addstr(cursor, 0, '>', curses.A_STANDOUT)
                 elif c == curses.KEY_DOWN or c == 66:
-                    stdscr.addstr(cursor, 0, ' ')
+                    w1.addstr(cursor, 0, ' ')
                     cursor = (cursor - 1 + len(files)) % len(files)
-                    stdscr.addstr(cursor, 0, '>', curses.A_STANDOUT)
+                    w1.addstr(cursor, 0, '>', curses.A_STANDOUT)
                 elif c == 10:
                     f = files[cursor]
                     f.toggle_stage()
-                    f.addstr(stdscr, cursor)
+                    f.addstr(w1, cursor)
                 elif c == ord('c'):
                     # commit
                     cnt = sum(1 for f in files if f.staged)
@@ -347,6 +358,9 @@ class Package(object):
                     curses.endwin()
                     self.do_commit(f for f in files if f.staged)
                     files = list(self.gen_file_status())
+                    if not files:
+                        curses.endwin()
+                        break
                     draw()
                 elif c == ord('d'):
                     # diff
@@ -369,6 +383,7 @@ class Package(object):
                 else:
                     stdscr.addstr(10, 0, 'you pressed {}'.format(c), curses.A_STANDOUT)
 
+                w1.refresh()
                 stdscr.refresh()
         
         curses.wrapper(main)
@@ -394,45 +409,14 @@ class Package(object):
             r = self.run(('git', 'commit', '-F', tf.name, '--cleanup=strip'))
 
     def clean_working_tree(self):
+        for pkg in self.gen_local_deps():
+            pkg.clean_working_tree()
 
         self.git_terminal()
-        return
-
-        r = self.run(('git', 'status', '--porcelain'))
         
-        lines = r.stdout.split(b'\n')
-        
-        for code, staged, fn in self.git_status_lines():
-                if code == 'M':
-    
-                    r = self.run(('git','diff', m.group(2)))
-    
-                    self.run(('git', 'add', m.group(2)))
-                    
-                    with tempfile.NamedTemporaryFile() as f:
-                        b = self.commit_notes(r.stdout)
-                        f.write(b)
-                        f.flush()
-                        
-                        self.run2(('vi', f.name))
-                        
-                        r = self.run(('git', 'commit', '-F', f.name, '--cleanup=strip'))
-    
-                        #print('out:',r.stdout.decode())
-                        #print('err:',r.stderr.decode())
-                        #print('rc:',r.returncode)
-    
-                    if r.returncode != 0:
-                        # unstage
-                        self.run(('git', 'reset', 'HEAD', m.group(2)))
-                        raise Exception('working tree not clean')
-            
         r = self.run(('git', 'status', '--porcelain'))
         if r.stdout:
             raise Exception('working tree not clean')
-    
-        #run2(('vi', temp, '>', '/dev/tty'))
-        #run2(('vi', temp))
     
     def is_clean(self):
         r = self.run(('git', 'status', '--porcelain'))
@@ -489,43 +473,41 @@ class Package(object):
         """
         :rtype: generator of Package objects
         """
-
+        with open(os.path.join(self.d, 'LOCAL_DEPS.txt')) as f:
+            for l in f:
+                l = l.strip()
+                if not l: continue
+                d = os.path.join(self.d, l)
+                pkg = Package(d)
+                pkg.current_version()
+                yield pkg
 
     def pipenv_install_deps(self):
-        with open(os.path.join(self.d, 'LOCAL_DEPS.txt')) as f:
-            b = f.read()
-            b = b.strip()
-            lines = b.split('\n')
+        print('local deps')
 
         pipfile = self.read_pipfile()
-        
-        print('local deps')
-        print(lines)
-        for l in lines:
-            if not l: continue
 
-            d1 = os.path.join(os.path.split(self.d)[0], l)
+        for pkg in self.gen_local_deps():
+
+            v_string = pkg.current_version().to_string()
+            spec = pkg.pkg + '==' + v_string
             
-            foo = Package(d1)
-            v_string = foo.current_version().to_string()
-            spec = l + '==' + v_string
-            
-            if pipfile['packages'][l] == ('==' + v_string):
+            if pipfile['packages'][pkg.pkg] == ('==' + v_string):
                 print('{} already in Pipfile'.format(spec))
                 continue
 
             d2 = os.path.join(d1, 'dist')
             
-            #foo.run(('make', 'wheel'))
+            #pkg.run(('make', 'wheel'))
             print('other package\'s root:', d1)
             print('spec = {}'.format(spec))
             
-            wf = foo.wheel_filename()
+            wf = pkg.wheel_filename()
             if not (wf in os.listdir(d2)):
                 print('wheel {} not in {}.'.format(wf, d2))
                 print('try to build wheel...')
             
-                foo.build_wheel()
+                pkg.build_wheel()
 
                 if not (wf in os.listdir(d2)):
                     raise Exception('building wheel did not produce expected wheel file...')
@@ -571,6 +553,11 @@ class Package(object):
         self.run(('git', 'push', 'origin', 'v{}'.format(v.to_string())))
 
     def commit(self, args):
+        
+        for pkg in self.gen_local_deps():
+            print(termcolor.colored(pkg.pkg, 'blue', attrs=['bold']))
+            pkg.commit(None)
+
         try:
             # steps
             # make sure working tree is clean
@@ -594,9 +581,8 @@ class Package(object):
             traceback.print_exc()
     
     def write_requirements(self):
-        r = subprocess.run(('pipenv', 'run', 'pip3', 'freeze'), stdout=subprocess.PIPE)
-        print(r.stdout.decode())
-    
+        r = self.run(('pipenv', 'run', 'pip3', 'freeze'))
+        
         with open(os.path.join(self.d, 'requirements.txt'), 'wb') as f:
             for l in r.stdout.split(b'\n'):
                 if b'git+' in l: continue
@@ -673,6 +659,9 @@ class Package(object):
         
         return kwargs
 
+    def test(self, args):
+        self.run(('python3', '-m', 'unittest', self.pkg.replace('-','_') + '.tests', '-fv'), stdout=None, stderr=None)
+
     def docs(self):
         self.run(('make', '-C', 'docs', 'html'))
         self.run(('make', '-C', 'docs', 'coverage'))
@@ -695,6 +684,9 @@ def upload(pkg, args):
 def docs(pkg, args):
     pkg.docs()
 
+def test(pkg, args):
+    pkg.test(args)
+
 def main(argv):
     
     parser = argparse.ArgumentParser()
@@ -702,7 +694,7 @@ def main(argv):
     
     def help_(_, args):
         parser.print_help()
-
+    
     parser.set_defaults(func=help_)
 
     parser_commit = subparsers.add_parser('commit')
@@ -716,6 +708,9 @@ def main(argv):
 
     parser_upload = subparsers.add_parser('upload')
     parser_upload.set_defaults(func=upload)
+
+    parser_test = subparsers.add_parser('test')
+    parser_test.set_defaults(func=test)
 
     parser_docs = subparsers.add_parser('docs')
     parser_docs.set_defaults(func=docs)
