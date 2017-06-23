@@ -1,7 +1,8 @@
 __version__ = '0.1b5'
 
-import toml
 import argparse
+import curses
+import enum
 import functools
 import re
 import os
@@ -10,6 +11,8 @@ import subprocess
 import tempfile
 import traceback
 from pprint import pprint
+
+import toml
 
 #DIR = os.getcwd()
 
@@ -203,7 +206,7 @@ class Package(object):
 
     def run(self, args, cwd=None):
         if cwd is None: cwd = self.d
-        print(' '.join(args))
+        #print(' '.join(args))
         r = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
         #o, e = p.communicate()
         #print(r.stdout.decode())
@@ -214,7 +217,7 @@ class Package(object):
     
     def run_shell(self, args, cwd=None):
         if cwd is None: cwd = self.d
-        print(args)
+        #print(args)
         r = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd, shell=True)
         if r.returncode != 0:
             raise Exception('Error in {}:\n{}\n{}'.format(repr(' '.join(args)), r.stdout.decode(), r.stderr.decode()))
@@ -230,7 +233,6 @@ class Package(object):
     def read_pipfile(self):
         with open(os.path.join(self.d, 'Pipfile')) as f:
             config = toml.loads(f.read())
-        pprint(config)
         return config
 
     def get_git_commit_HEAD(self):
@@ -242,29 +244,166 @@ class Package(object):
         lines = r.stdout.split(b'\n')
         for l in lines:
             if not l: continue
-
+            
             l = l.decode()
 
-            m = re.match('^\s(\w+)\s([\w+-/\.]+)$', l)
+            print('  {}'.format(repr(l)))
+
+            m = re.match('^(..)\s([\w+-/\.]+)$', l)
             
             if not m: raise Exception('failed to parse git status line: {} lines: {}'.format(repr(l), lines))
             
             if m:
-                if m.group(1) == 'M':
-                    yield m.group(1), m.group(2)
+                print('  {}'.format(repr(m.group(1))))
+                if m.group(1) == ' M':
+                    yield Package.FileStatus.Type.MODIFIED, False, m.group(2)
+                elif m.group(1) == 'M ':
+                    yield Package.FileStatus.Type.MODIFIED, True, m.group(2)
+                elif m.group(1) == ' D':
+                    yield Package.FileStatus.Type.DELETED, False, m.group(2)
+                elif m.group(1) == 'D ':
+                    yield Package.FileStatus.Type.DELETED, True, m.group(2)
                 else:
-                    Exception('unhandled code: {}'.format(m.group(1)))
-           
+                    raise Exception('unhandled code: {}'.format(repr(m.group(1))))
+
+    class FileStatus(object):
+        class Type(enum.Enum):
+            MODIFIED = 0
+            DELETED = 1
+
+        def __init__(self, pkg, type_, staged, filename):
+            self.pkg = pkg
+            self.type_ = type_
+            self.staged = staged
+            self.filename = filename
+        
+        def toggle_stage(self):
+            if self.staged:
+                self.pkg.run(('git','reset','HEAD',self.filename))
+                self.staged = False
+            else:
+                self.pkg.run(('git','add',self.filename))
+                self.staged = True
+
+        def addstr(self, stdscr, i):
+            if self.staged:
+                attr = curses.A_BOLD
+            else:
+                attr = 0
+            stdscr.addstr(i, 2, '{:8} {}'.format(self.type_.name, self.filename), attr)
+
+    def gen_file_status(self):
+        for code, staged, fn in self.git_status_lines():
+            yield Package.FileStatus(self, code, staged, fn)
+
+    def git_terminal(self):
+        
+        def main(stdscr):
+            curses.curs_set(0)
+            # Clear screen
+
+            files = list(self.gen_file_status())
+            if not files:
+                curses.endwin()
+                return
+
+            cursor = 0
+            
+            def draw():
+                stdscr.clear()
+
+                # This raises ZeroDivisionError when i == 10.
+                for i, f in zip(range(len(files)), files):
+                    f.addstr(stdscr, i)
+            
+                stdscr.addstr(cursor, 0, '>', curses.A_STANDOUT)
+        
+                stdscr.refresh()
+        
+            draw()
+
+            while True:
+                c = stdscr.getch()
+
+                if c == curses.KEY_UP or c == 65:
+                    stdscr.addstr(cursor, 0, ' ')
+                    cursor = (cursor + 1) % len(files)
+                    stdscr.addstr(cursor, 0, '>', curses.A_STANDOUT)
+                elif c == curses.KEY_DOWN or c == 66:
+                    stdscr.addstr(cursor, 0, ' ')
+                    cursor = (cursor - 1 + len(files)) % len(files)
+                    stdscr.addstr(cursor, 0, '>', curses.A_STANDOUT)
+                elif c == 10:
+                    f = files[cursor]
+                    f.toggle_stage()
+                    f.addstr(stdscr, cursor)
+                elif c == ord('c'):
+                    # commit
+                    cnt = sum(1 for f in files if f.staged)
+                    if cnt == 0:
+                        stdscr.addstr(11, 0, 'nothing is staged', curses.A_STANDOUT)
+                        continue
+                    
+                    curses.endwin()
+                    self.do_commit(f for f in files if f.staged)
+                    files = list(self.gen_file_status())
+                    draw()
+                elif c == ord('d'):
+                    # diff
+                    f = files[cursor]
+
+                    if not f.type_ == Package.FileStatus.Type.MODIFIED:
+                        continue
+
+                    curses.endwin()
+                    r = self.run(('git','diff','HEAD',f.filename))
+                    with tempfile.NamedTemporaryFile() as tf:
+                        tf.write(r.stdout)
+                        tf.flush()
+                        subprocess.run(('less',tf.name))
+
+                    draw()
+                elif c == 27:
+                    curses.endwin()
+                    break
+                else:
+                    stdscr.addstr(10, 0, 'you pressed {}'.format(c), curses.A_STANDOUT)
+
+                stdscr.refresh()
+        
+        curses.wrapper(main)
+
+    def do_commit(self, files):
+        with tempfile.NamedTemporaryFile() as tf:
+            
+            r = self.run(('git', 'status'))
+            lines = [b'', b''] + commented_lines(r.stdout)
+            
+            for f in files:
+                if f.type_ == Package.FileStatus.Type.MODIFIED:
+                    r = self.run(('git','diff','HEAD',f.filename))
+                    lines += [b''] + commented_lines(r.stdout)
+            
+            b = b'\n'.join(lines)
+
+            tf.write(b)
+            tf.flush()
+            
+            self.run2(('vi', tf.name))
+            
+            r = self.run(('git', 'commit', '-F', tf.name, '--cleanup=strip'))
+
     def clean_working_tree(self):
+
+        self.git_terminal()
+        return
+
         r = self.run(('git', 'status', '--porcelain'))
         
         lines = r.stdout.split(b'\n')
-    
-        for l in lines:
-            m = re.match('^\s(\w+)\s([\w+/\.]+).*', l.decode())
-            if m:
-                if m.group(1) == 'M':
-                    print('modified: {}'.format(m.group(2)))
+        
+        for code, staged, fn in self.git_status_lines():
+                if code == 'M':
     
                     r = self.run(('git','diff', m.group(2)))
     
@@ -287,13 +426,13 @@ class Package(object):
                         # unstage
                         self.run(('git', 'reset', 'HEAD', m.group(2)))
                         raise Exception('working tree not clean')
+            
+        r = self.run(('git', 'status', '--porcelain'))
+        if r.stdout:
+            raise Exception('working tree not clean')
     
-            r = self.run(('git', 'status', '--porcelain'))
-            if r.stdout:
-                raise Exception('working tree not clean')
-    
-            #run2(('vi', temp, '>', '/dev/tty'))
-            #run2(('vi', temp))
+        #run2(('vi', temp, '>', '/dev/tty'))
+        #run2(('vi', temp))
     
     def is_clean(self):
         r = self.run(('git', 'status', '--porcelain'))
@@ -447,7 +586,6 @@ class Package(object):
         except Exception as e:
             print(e)
             traceback.print_exc()
-        pass
     
     def write_requirements(self):
         r = subprocess.run(('pipenv', 'run', 'pip3', 'freeze'), stdout=subprocess.PIPE)
