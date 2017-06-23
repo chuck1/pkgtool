@@ -2,6 +2,11 @@
 next
 ----
 
+0.1b7
+-----
+
+- trying to resolve packaging errors
+
 0.1b6
 -----
 

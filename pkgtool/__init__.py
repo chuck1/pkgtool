@@ -480,6 +480,21 @@ class Package(object):
         """
         :rtype: generator of Package objects
         """
+
+        # exploring alternate method
+        pipfile = self.read_pipfile()
+        for k, v in pipfile['dev-packages'].items():
+            m = re.match('-e (.*)', k)
+            if m:
+                self.print_(repr(k), repr(v))
+                self.print_(repr(m.group(1)))
+
+                d = os.path.join(self.d, m.group(1))
+                pkg = Package(d)
+                pkg.current_version()
+                yield pkg
+        
+        return
         with open(os.path.join(self.d, 'LOCAL_DEPS.txt')) as f:
             for l in f:
                 l = l.strip()
@@ -489,18 +504,21 @@ class Package(object):
                 pkg.current_version()
                 yield pkg
 
-    def pipenv_install_deps(self):
-        print('local deps')
+    def print_(self, *args):
+        print(termcolor.colored('{:<16}'.format(self.pkg), 'white', attrs=['bold']), *args)
 
-        pipfile = self.read_pipfile()
+    def pipenv_install_deps(self):
+        self.print_('local deps')
 
         for pkg in self.gen_local_deps():
 
             v_string = pkg.current_version().to_string()
             spec = pkg.pkg + '==' + v_string
-            
+ 
+            pipfile = self.read_pipfile()
+           
             if pipfile['packages'][pkg.pkg] == ('==' + v_string):
-                print('{} already in Pipfile'.format(spec))
+                self.print_('{} already in Pipfile'.format(spec))
                 continue
 
             d2 = os.path.join(pkg.d, 'dist')
@@ -560,7 +578,8 @@ class Package(object):
         self.run(('git', 'push', 'origin', 'v{}'.format(v.to_string())))
 
     def commit(self, args):
-        
+        self.print_('pkgtool')
+
         for pkg in self.gen_local_deps():
             print(termcolor.colored(pkg.pkg, 'blue', attrs=['bold']))
             pkg.commit(None)
@@ -569,7 +588,7 @@ class Package(object):
             # steps
             # make sure working tree is clean
             self.clean_working_tree()
-            print('working tree is clean')
+            self.print_('working tree is clean')
     
             # pipenv install source versions of dependent project packages
             self.pipenv_install_deps()
@@ -733,6 +752,7 @@ def main(argv):
         args.func(pkg, args)
     except Exception as e:
         print(e)
+        raise
         sys.exit(1)
     
     
