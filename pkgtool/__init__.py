@@ -538,7 +538,8 @@ class Package(object):
             print('spec = {}'.format(spec))
             
             wf = pkg.wheel_filename()
-            if not (wf in os.listdir(d2)):
+            #if not (wf in os.listdir(d2)):
+            if not os.path.exists(os.path.join(d2, wf)):
                 print('wheel {} not in {}.'.format(wf, d2))
                 print('try to build wheel...')
             
