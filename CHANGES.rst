@@ -2,8 +2,13 @@
 next
 ----
 
+0.1b6
+-----
+
 - add interactive terminal for commit
 - add docs command
+- add test command
+- impove version change options
 
 0.1b5
 -----
