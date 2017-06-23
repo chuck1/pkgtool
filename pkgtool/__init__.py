@@ -646,8 +646,10 @@ class Package(object):
 
         r = self.run(('mkdir', '-p', 'dist'))
         r = self.run_shell('rm -f dist/*')
-
-        self.run(('python3', 'setup.py', 'bdist_wheel'))
+        
+        args = ('python3', 'setup.py', 'bdist_wheel')
+        self.print_(*args)
+        self.run(args, stdout=None, stderr=None)
         
     def upload_wheel(self):
         self.build_wheel()
