@@ -515,7 +515,7 @@ class Package(object):
     def spec_in_pipfile(self, pipfile, pkg, v):
         if not 'packages' in pipfile: return False
         if not pkg in pipfile['packages']: return False
-        return (pipfile['packages'][pkg] == ('==' + v))
+        return (pipfile['packages'][pkg] == ('>=' + v))
 
     def pipenv_install_deps(self):
         self.print_('local deps')
@@ -523,7 +523,7 @@ class Package(object):
         for pkg in self.gen_local_deps():
 
             v_string = pkg.current_version().to_string()
-            spec = pkg.pkg + '==' + v_string
+            spec = pkg.pkg + '>=' + v_string
  
             pipfile = self.read_pipfile()
             
