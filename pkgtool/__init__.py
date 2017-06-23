@@ -527,7 +527,7 @@ class Package(object):
  
             pipfile = self.read_pipfile()
             
-            if self.spec_in_pipfile(pipfile, pkg,pkg, v_string):
+            if self.spec_in_pipfile(pipfile, pkg.pkg, v_string):
                 self.print_('{} already in Pipfile'.format(spec))
                 continue
 
