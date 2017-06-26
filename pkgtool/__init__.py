@@ -665,6 +665,8 @@ class Package(object):
         return self.pkg + '-' + s + '-py3-none-any.whl'
 
     def build_wheel(self):
+        self.commit_deploy(None)
+
         self.assert_head_at_version_tag()
 
         self.run(('pipenv --rm'))
