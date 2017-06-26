@@ -666,6 +666,14 @@ class Package(object):
 
     def build_wheel(self):
         self.assert_head_at_version_tag()
+
+        self.run(('pipenv --rm'))
+        self.run(('pipenv --three'))
+        self.run(('pipenv install'))
+
+        self.test()
+
+        self.write_requirements()
         args = ('python3', 'setup.py', 'bdist_wheel')
         self.print_(*args)
         self.run(args, stdout=None, stderr=None)

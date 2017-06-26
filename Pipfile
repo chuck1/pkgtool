@@ -5,8 +5,8 @@ url = "https://pypi.python.org/simple"
 [packages]
 toml = "*"
 termcolor = "*"
+"-e ." = "*"
 
 [dev-packages]
-"-e ." = "*"
 Sphinx = "*"
 numpy = "*"
