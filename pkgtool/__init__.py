@@ -214,9 +214,9 @@ class Package(object):
         self.config = self.read_config()
         self.pkg = self.config['name']
 
-    def run(self, args, cwd=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
+    def run(self, args, cwd=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False):
         if cwd is None: cwd = self.d
-        #print(' '.join(args))
+        if print_cmd: self.print_(' '.join(args))
         r = subprocess.run(args, stdout=stdout, stderr=stderr, cwd=cwd)
         #o, e = p.communicate()
         #print(r.stdout.decode())
@@ -670,16 +670,15 @@ class Package(object):
 
         self.assert_head_at_version_tag()
 
-        self.run(('pipenv', '--rm'))
-        self.run(('pipenv', '--three'))
-        self.run(('pipenv', 'install'))
+        self.run(('pipenv', '--rm'), print_cmd=True)
+        self.run(('pipenv', '--three'), print_cmd=True)
+        self.run(('pipenv', 'install'), print_cmd=True)
 
-        self.test()
+        self.test(None)
 
         self.write_requirements()
         args = ('python3', 'setup.py', 'bdist_wheel')
-        self.print_(*args)
-        self.run(args, stdout=None, stderr=None)
+        self.run(args, stdout=None, stderr=None, print_cmd=True)
         
     def upload_wheel(self):
         self.build_wheel()
