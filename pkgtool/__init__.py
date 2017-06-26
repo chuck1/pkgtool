@@ -597,6 +597,7 @@ class Package(object):
         Ensure a clean working directory and then ``pipenv install`` the latest version 
         """
         if self.pkg in VISITED:
+            print('already visted')
             return
         VISITED.append(self.pkg)
         
