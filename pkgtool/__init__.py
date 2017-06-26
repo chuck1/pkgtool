@@ -180,26 +180,6 @@ class VersionProject(Version):
         r = self.proj.run(('git', 'rev-parse', 'v'+self.to_string()))
         return r.stdout.strip()
 
-def test_version(s):
-    v = Version.from_string(s)
-    print(v.to_string())
-    for i in range(len(v.rel)):
-        print(v.next(i).to_string())
-    if v.sv_code:
-        print(v.next_sv().to_string())
-        print(v.remove_sv().to_string())
-    print()
-
-def tests_version():
-    test_version('__version__ = \'1\'')
-    test_version('__version__ = \'1a0\'')
-    test_version('__version__ = \'1.2\'')
-    test_version('__version__ = \'1.2a0\'')
-    test_version('__version__ = \'1.2.3\'')
-    test_version('__version__ = \'1.2.3a0\'')
-    test_version('__version__ = \'1.2.3b0\'')
-    test_version('__version__ = \'1.2.3dev0\'')
-
 def commented_lines(b):
     return [b'# ' + l for l in b.split(b'\n')]
 
