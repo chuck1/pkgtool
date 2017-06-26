@@ -712,7 +712,7 @@ class Package(object):
         return kwargs
     
     def test(self, args):
-        self.run(('pipenv','run','pytest'), stdout=None, stderr=None)
+        self.run(('pipenv','run','pytest','--maxfail=1','--ff'), stdout=None, stderr=None)
 
     def docs(self):
         self.run(('make', '-C', 'docs', 'html'))
