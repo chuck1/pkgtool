@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "6d86749afb269ee1a805cd8a9bafd109b46ebff54da0e2dc613f9e6e012d30f5"
+            "sha256": "72cd43881232219488d6a3b3fd5f3df28adaf63d507b2bd85794ea26aa9945e0"
         },
         "requires": {},
         "sources": [
@@ -29,6 +29,7 @@
         }
     },
     "develop": {
+        "-e .": "*",
         "alabaster": {
             "version": "==0.7.10"
         },
