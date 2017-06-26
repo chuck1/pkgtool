@@ -670,9 +670,9 @@ class Package(object):
 
         self.assert_head_at_version_tag()
 
-        self.run(('pipenv --rm'))
-        self.run(('pipenv --three'))
-        self.run(('pipenv install'))
+        self.run(('pipenv', '--rm'))
+        self.run(('pipenv', '--three'))
+        self.run(('pipenv', 'install'))
 
         self.test()
 
