@@ -592,7 +592,10 @@ class Package(object):
         self.run(('git', 'tag', 'v{}'.format(v.to_string())))
         self.run(('git', 'push', 'origin', 'v{}'.format(v.to_string())))
 
-    def commit(self, args):
+    def commit_deploy(self, args):
+        """
+        Ensure a clean working directory and then ``pipenv install`` the latest version 
+        """
         if self.pkg in VISITED:
             return
         VISITED.append(self.pkg)
@@ -601,7 +604,7 @@ class Package(object):
 
         for pkg in self.gen_local_deps():
             print(termcolor.colored(pkg.pkg, 'blue', attrs=['bold']))
-            pkg.commit(None)
+            pkg.commit_deploy(None)
 
         try:
             # steps
@@ -626,6 +629,21 @@ class Package(object):
             #print(e)
             #traceback.print_exc()
             #sys.exit(1)
+
+    def commit(self, args):
+        if self.pkg in VISITED:
+            return
+        VISITED.append(self.pkg)
+        
+        self.print_('pkgtool')
+
+        for pkg in self.gen_local_deps():
+            print(termcolor.colored(pkg.pkg, 'blue', attrs=['bold']))
+            pkg.commit(None)
+
+        # make sure working tree is clean
+        self.clean_working_tree()
+        self.print_('working tree is clean')
     
     def write_requirements(self):
         r = self.run(('pipenv', 'run', 'pip3', 'freeze'))
@@ -701,9 +719,9 @@ class Package(object):
                 'install_requires': install_requires,}
         
         return kwargs
-
+    
     def test(self, args):
-        self.run(('python3', '-m', 'unittest', self.pkg.replace('-','_') + '.tests', '-fv'), stdout=None, stderr=None)
+        self.run(('pipenv','run','pytest'), stdout=None, stderr=None)
 
     def docs(self):
         self.run(('make', '-C', 'docs', 'html'))
