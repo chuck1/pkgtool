@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "c4cda420cf20371898e9ba84c0e793655415dbd04d3d40e74b5c0a77a5449a00"
+            "sha256": "6d86749afb269ee1a805cd8a9bafd109b46ebff54da0e2dc613f9e6e012d30f5"
         },
         "requires": {},
         "sources": [
@@ -12,7 +12,6 @@
         ]
     },
     "default": {
-        "-e .": "*",
         "py": {
             "version": "==1.4.34"
         },
@@ -83,6 +82,12 @@
         },
         "sphinxcontrib-websupport": {
             "version": "==1.0.1"
+        },
+        "termcolor": {
+            "version": "==1.1.0"
+        },
+        "toml": {
+            "version": "==0.9.2"
         },
         "urllib3": {
             "version": "==1.21.1"

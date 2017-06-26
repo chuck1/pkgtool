@@ -187,6 +187,8 @@ class Package(object):
     """
     Represents a python package project.
 
+    .. note: To install the project from source, use dev-packages: ``pipenv install --dev -e .``
+
     :param d: root of project
     """
     def __init__(self, d):
@@ -653,6 +655,7 @@ class Package(object):
         self.run(('pipenv', '--rm'), print_cmd=True)
         self.run(('pipenv', '--three'), print_cmd=True)
         self.run(('pipenv', 'install'), print_cmd=True)
+        self.run(('pipenv', 'install', '-e', '.'), print_cmd=True)
 
         self.test(None)
 
