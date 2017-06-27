@@ -685,6 +685,8 @@ class Package(object):
 
         self.write_requirements()
         
+        shutil.rmtree(os.path.join(self.d, 'build'))
+
         self.run(('python3', 'setup.py', 'bdist_wheel'), print_cmd=True)
         
     def upload_wheel(self, args):
