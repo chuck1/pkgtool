@@ -514,8 +514,13 @@ class Package(object):
         print(termcolor.colored('{:<16}'.format(self.pkg), 'white', attrs=['bold']), *args)
 
     def spec_in_pipfile(self, pipfile, pkg, v):
-        if not 'packages' in pipfile: return False
-        if not pkg in pipfile['packages']: return False
+        if not 'packages' in pipfile:
+            self.print_('Pipfile does not have a \'packages\' attribute')
+            return False
+
+        if not pkg in pipfile['packages']:
+            self.print_('Pipfile \'package\' does not contain {}'.format(repr(pkg)))
+            return False
         
         s = pipfile['packages'][pkg]
         if s == ('>=' + v):
