@@ -1,4 +1,4 @@
-__version__ = '0.1b24'
+__version__ = '0.1b25'
 
 import argparse
 import curses
@@ -599,8 +599,6 @@ class Package(object):
         self.run(('pipenv', 'install'), print_cmd=True)
         self.run(('pipenv', 'install', '--dev', '-e', '.'), print_cmd=True)
         self.run(('git','add','--all'))
-
-        self.test(None)
 
     def release(self, args):
         """
