@@ -639,7 +639,7 @@ class Package(object):
             self.print_('working tree is clean')
     
             # pipenv install source versions of dependent project packages
-            self.pipenv_install_deps()
+            self.pipenv_install_deps(args)
     
             # if clean, compare to version tag matching version in source
             if self.compare_ancestor_version():
