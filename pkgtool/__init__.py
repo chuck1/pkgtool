@@ -647,7 +647,7 @@ class Package(object):
 
         for pkg in self.gen_local_deps():
             print(termcolor.colored(pkg.pkg, 'blue', attrs=['bold']))
-            pkg.commit(None)
+            pkg.commit(args)
 
         # make sure working tree is clean
         self.clean_working_tree(args)
