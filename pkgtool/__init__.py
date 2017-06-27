@@ -462,22 +462,24 @@ class Package(object):
         if not (c == c0):
             Exception('tag v{} is not ancestor of HEAD')
         
-        print('{:8} '.format('v' + v.to_string()), c0)
-        print('{:8} '.format('HEAD'), c1)
-        print('{:8} '.format('ancestor'), c)
+        #print('{:8} '.format('v' + v.to_string()), c0)
+        #print('{:8} '.format('HEAD'), c1)
+        #print('{:8} '.format('ancestor'), c)
 
         # HEAD is at tag
         if (c == c1):
-            print('HEAD is at {}'.format(v.to_string()))
+            self.print_('HEAD is at {}'.format(v.to_string()))
             return False
         else:
-            print('HEAD is ahread of v{}'.format(v.to_string()))
+            self.print_('HEAD is ahread of v{}'.format(v.to_string()))
             return True
     
     def gen_local_deps(self):
         """
         :rtype: generator of Package objects
         """
+
+        self.print_('parsing dev-packages')
 
         # exploring alternate method
         pipfile = self.read_pipfile()
@@ -680,8 +682,8 @@ class Package(object):
         self.assert_head_at_version_tag()
 
         self.write_requirements()
-        args = ('python3', 'setup.py', 'bdist_wheel')
-        self.run(args, stdout=None, stderr=None, print_cmd=True)
+        
+        self.run(('python3', 'setup.py', 'bdist_wheel'), print_cmd=True)
         
     def upload_wheel(self, args):
         self.build_wheel()
@@ -816,8 +818,6 @@ def main(argv):
         print(e)
         raise
         sys.exit(1)
-    
-    
     
 
 
