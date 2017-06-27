@@ -6,12 +6,16 @@ import pkgtool
 BASE_DIR = os.path.dirname(__file__)
 
 def test():
+ 
+    d = os.path.join(BASE_DIR, '_test_package')
+   
+    if not os.path.exists(os.path.join(d, '.git')):
+        subprocess.run(('git', 'init'), cwd=d)
 
     try:
         pkgtool.main(['pkgtool'])
     except: pass
     
-    d = os.path.join(BASE_DIR, '_test_package')
 
     pkgtool.main(['pkgtool', d, 'version'])
 
