@@ -1,0 +1,12 @@
+name = "test_package"
+description = "test package"
+url = ""
+author = "Charles Rymal"
+author_email = "charlesrymal@gmail.com"
+license = "MIT"
+
+packages = [
+	"test_package",
+]
+
+

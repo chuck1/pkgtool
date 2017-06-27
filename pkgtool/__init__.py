@@ -196,9 +196,12 @@ class Package(object):
         self.config = self.read_config()
         self.pkg = self.config['name']
 
-    def run(self, args, cwd=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False):
+    def run(self, args, cwd=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False, dry_run=False):
         if cwd is None: cwd = self.d
-        if print_cmd: self.print_(' '.join(args))
+        
+        if print_cmd or dry_run: self.print_(' '.join(args))
+        if dry_run: return
+        
         r = subprocess.run(args, stdout=stdout, stderr=stderr, cwd=cwd)
         #o, e = p.communicate()
         #print(r.stdout.decode())
@@ -403,11 +406,14 @@ class Package(object):
             
             r = self.run(('git', 'commit', '-F', tf.name, '--cleanup=strip'))
 
-    def clean_working_tree(self):
+    def clean_working_tree(self, args):
         for pkg in self.gen_local_deps():
-            pkg.clean_working_tree()
-
-        self.git_terminal()
+            pkg.clean_working_tree(args)
+        
+        if args.no_term:
+            self.auto_commit('PKGTOOL auto commit all')
+        else:
+            self.git_terminal()
         
         r = self.run(('git', 'status', '--porcelain'))
         if r.stdout:
@@ -578,7 +584,7 @@ class Package(object):
         self.run(('git', 'tag', 'v{}'.format(v.to_string())), print_cmd=True)
         self.run(('git', 'push', 'origin', 'v{}'.format(v.to_string())), print_cmd=True)
 
-    def reset_env_and_test():
+    def reset_env_and_test(self):
         # reset virtualenv
         self.run(('pipenv', '--rm'), print_cmd=True)
         self.run(('pipenv', '--three'), print_cmd=True)
@@ -603,12 +609,12 @@ class Package(object):
 
         for pkg in self.gen_local_deps():
             print(termcolor.colored(pkg.pkg, 'blue', attrs=['bold']))
-            pkg.release(None)
+            pkg.release(args)
 
         try:
             # steps
             # make sure working tree is clean
-            self.clean_working_tree()
+            self.clean_working_tree(args)
             self.print_('working tree is clean')
     
             # pipenv install source versions of dependent project packages
@@ -618,7 +624,7 @@ class Package(object):
             if self.compare_ancestor_version():
                 print('this branch is ahead of v{}'.format(self.current_version().to_string()))
                 self.input_version_change()
-                self.upload_wheel()
+                self.upload_wheel(args)
             
             # if not clean or at downstream commit, change version, commit, push, and upload
         except Exception as e:
@@ -639,7 +645,7 @@ class Package(object):
             pkg.commit(None)
 
         # make sure working tree is clean
-        self.clean_working_tree()
+        self.clean_working_tree(args)
         self.print_('working tree is clean')
     
     def write_requirements(self):
@@ -661,19 +667,18 @@ class Package(object):
         s = self.current_version().to_string()
         return self.pkg + '-' + s + '-py3-none-any.whl'
 
-    def auto_commit(self):
+    def auto_commit(self, m):
         self.run(('git','add','--all'))
-        self.run(('git','commit','-m','minor'))
+        self.run(('git','commit','-m',m))
 
     def build_wheel(self):
         self.assert_head_at_version_tag()
-        
 
         self.write_requirements()
         args = ('python3', 'setup.py', 'bdist_wheel')
         self.run(args, stdout=None, stderr=None, print_cmd=True)
         
-    def upload_wheel(self):
+    def upload_wheel(self, args):
         self.build_wheel()
 
         s = self.current_version().to_string()
@@ -688,7 +693,7 @@ class Package(object):
         else:
             raise Exception()
         
-        self.run(('twine', 'upload', os.path.join('dist', wf)), print_cmd=True)
+        self.run(('twine', 'upload', os.path.join('dist', wf)), print_cmd=True, dry_run=args.no_upload)
 
     def read_config(self):
         with open(os.path.join(self.d, 'Pytool')) as f:
@@ -722,7 +727,8 @@ class Package(object):
         return kwargs
     
     def test(self, args):
-        self.run(('pipenv','run','pytest','--maxfail=1','--ff'), stdout=None, stderr=None)
+        self.run(('pipenv','run','pytest'), stdout=None, stderr=None)
+        #self.run(('pipenv','run','pytest','--maxfail=1','--ff'), stdout=None, stderr=None)
 
     def docs(self):
         self.run(('make', '-C', 'docs', 'html'))
@@ -754,7 +760,9 @@ def test(pkg, args):
 
 def main(argv):
     
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(prog=argv[0])
+    parser.add_argument('d', nargs='?', default=os.getcwd())
+
     subparsers = parser.add_subparsers()
     
     def help_(_, args):
@@ -766,6 +774,8 @@ def main(argv):
     parser_commit.set_defaults(func=commit)
 
     parser_release = subparsers.add_parser('release')
+    parser_release.add_argument('--no-upload', action='store_true', dest='no_upload')
+    parser_release.add_argument('--no-term', action='store_true', dest='no_term')
     parser_release.set_defaults(func=release)
  
     parser_version = subparsers.add_parser('version')
@@ -782,11 +792,15 @@ def main(argv):
 
     parser_docs = subparsers.add_parser('docs')
     parser_docs.set_defaults(func=docs)
-    
-    args = parser.parse_args()
-    
+
+    print('argv={}'.format(argv))
+
+    args = parser.parse_args(argv[1:])
+
+    print('d={}'.format(repr(args.d)))
+
     # TODO use args to possible use different directory
-    pkg = Package(os.getcwd())
+    pkg = Package(args.d)
 
     try:
         args.func(pkg, args)
