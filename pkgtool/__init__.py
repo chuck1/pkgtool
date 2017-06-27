@@ -534,22 +534,24 @@ class Package(object):
             d2 = os.path.join(pkg.d, 'dist')
             
             #pkg.run(('make', 'wheel'))
-            print('other package\'s root:', pkg.d)
-            print('spec = {}'.format(spec))
+            self.print_('other package\'s root:', pkg.d)
+            self.print_('spec = {}'.format(spec))
             
             wf = pkg.wheel_filename()
             #if not (wf in os.listdir(d2)):
             if not os.path.exists(os.path.join(d2, wf)):
-                print('wheel {} not in {}.'.format(wf, d2))
-                print('try to build wheel...')
+                self.print_('wheel {} not in {}.'.format(wf, d2))
+                self.print_('try to build wheel...')
             
                 pkg.build_wheel()
 
                 if not (wf in os.listdir(d2)):
-                    raise Exception('building wheel did not produce expected wheel file...')
+                    e = Exception('building wheel did not produce expected wheel file...')
+                    self.print_(e)
+                    raise e
 
-            self.run(('pipenv', 'install', os.path.join(d2, wf)))
-            self.run(('pipenv', 'install', spec))
+            self.run(('pipenv', 'install', os.path.join(d2, wf)), print_cmd=True)
+            self.run(('pipenv', 'install', spec), print_cmd=True)
 
             s_lines = list(self.git_status_lines())
             if s_lines:
@@ -558,8 +560,8 @@ class Package(object):
                 if not ((s_lines[0][0] == 'M') and (s_lines[0][1] == 'Pipfile')):
                     Exception(str(s_lines))
             
-                self.run(('git', 'add', 'Pipfile'))
-                self.run(('git', 'commit', '-m', 'PKGTOOL update {} to {}'.format(pkg.pkg, v_string)))
+                self.run(('git', 'add', 'Pipfile'), print_cmd=True)
+                self.run(('git', 'commit', '-m', 'PKGTOOL update {} to {}'.format(pkg.pkg, v_string)), print_cmd=True)
 
     def assert_status(self, lines):
         s = set(self.git_status_lines())
