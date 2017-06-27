@@ -22,6 +22,6 @@ def test():
     with open(os.path.join(d, 'test_package', 'hello.py'), 'w') as f:
         f.write('a = {}\n'.format(time.time()))
     
-    pkgtool.main(['pkgtool', d, 'release', '--no-upload', '--no-term', '--no-recursion'])
+    pkgtool.main(['pkgtool', d, 'release', '--no-upload', '--no-term', '--no-recursion', '--no-input'])
    
 
