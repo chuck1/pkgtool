@@ -1,4 +1,4 @@
-__version__ = '0b4'
+__version__ = '0b5'
 
 import test_package.hello
 

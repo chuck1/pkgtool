@@ -673,8 +673,8 @@ class Package(object):
         return self.pkg + '-' + s + '-py3-none-any.whl'
 
     def auto_commit(self, m):
-        self.run(('git','add','--all'))
-        self.run(('git','commit','-m',m))
+        self.run(('git','add','--all'), print_cmd=True)
+        self.run(('git','commit','-m',m), print_cmd=True)
 
     def build_wheel(self):
         self.assert_head_at_version_tag()
