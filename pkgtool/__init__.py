@@ -517,9 +517,16 @@ class Package(object):
         if not 'packages' in pipfile:
             self.print_('Pipfile does not have a \'packages\' attribute')
             return False
+        
+        pkg1 = pkg.replace('_','-')
+        pkg2 = pkg.replace('-','_')
 
-        if not pkg in pipfile['packages']:
-            self.print_('Pipfile \'package\' does not contain {}'.format(repr(pkg)))
+        if pkg1 in pipfile['packages']:
+            pkg = pkg1
+        elif pkg2 in pipfile['packages']:
+            pkg = pkg2
+        else:
+            self.print_('Pipfile \'packages\' does not contain {} or {}'.format(repr(pkg1), repr(pkg2)))
             return False
         
         s = pipfile['packages'][pkg]
