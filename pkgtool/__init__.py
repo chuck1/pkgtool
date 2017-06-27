@@ -611,9 +611,10 @@ class Package(object):
         
         self.print_('pkgtool')
 
-        for pkg in self.gen_local_deps():
-            print(termcolor.colored(pkg.pkg, 'blue', attrs=['bold']))
-            pkg.release(args)
+        if not args.no_recursion:
+            for pkg in self.gen_local_deps():
+                print(termcolor.colored(pkg.pkg, 'blue', attrs=['bold']))
+                pkg.release(args)
 
         try:
             # steps
@@ -781,6 +782,7 @@ def main(argv):
     parser_release.add_argument('--no-upload', action='store_true', dest='no_upload')
     parser_release.add_argument('--no-term', action='store_true', dest='no_term')
     parser_release.add_argument('--no-input', action='store_true', dest='no_input')
+    parser_release.add_argument('--no-recursion', action='store_true', dest='no_recursion')
     parser_release.set_defaults(func=release)
  
     parser_version = subparsers.add_parser('version')
