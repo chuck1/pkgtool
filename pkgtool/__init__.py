@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import traceback
 from pprint import pprint
+import shutil
 
 import termcolor
 import toml
