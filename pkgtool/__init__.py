@@ -114,7 +114,7 @@ class Version(object):
             if len(self.rel) < 3:
                 yield Option(self.input_add_release_level_pre, self.add_release_level().to_string())
 
-    def prompt_change(self):
+    def prompt_change(self, no_input=False):
         options = list(self.version_change_options())
         
         print('current:', self.to_string())
@@ -122,7 +122,11 @@ class Version(object):
         for i, o in zip(range(len(options)), options):
             print('{:2}  {}'.format(i, o.s))
         
-        s = input('choice (0-{}) [0]:'.format(len(options)-1))
+        if no_input:
+            s = None
+        else:
+            s = input('choice (0-{}) [0]:'.format(len(options)-1))
+
         if s:
             i = int(s)
         else:
@@ -558,9 +562,9 @@ class Package(object):
         if not (s == lines):
             raise Exception('assertion failed {}=={}'.format(s, lines))
 
-    def input_version_change(self):
+    def input_version_change(self, args):
         v0 = self.current_version()
-        v = v0.prompt_change()
+        v = v0.prompt_change(no_input=args.no_input)
 
         fn0 = os.path.join(self.pkg, '__init__.py')
         fn = os.path.join(self.d, fn0)
@@ -776,6 +780,7 @@ def main(argv):
     parser_release = subparsers.add_parser('release')
     parser_release.add_argument('--no-upload', action='store_true', dest='no_upload')
     parser_release.add_argument('--no-term', action='store_true', dest='no_term')
+    parser_release.add_argument('--no-input', action='store_true', dest='no_input')
     parser_release.set_defaults(func=release)
  
     parser_version = subparsers.add_parser('version')
