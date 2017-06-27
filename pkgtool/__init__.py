@@ -1,4 +1,4 @@
-__version__ = '0.1b22'
+__version__ = '0.1b23'
 
 import argparse
 import curses
@@ -800,6 +800,7 @@ def main(argv):
     parser_docs = subparsers.add_parser('docs')
     parser_docs.set_defaults(func=docs)
 
+    print('pkgtool',__version__)
     print('argv={}'.format(argv))
 
     args = parser.parse_args(argv[1:])
