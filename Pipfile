@@ -2,15 +2,15 @@
 verify_ssl = true
 url = "https://pypi.python.org/simple"
 
-[packages]
-toml = "*"
-termcolor = "*"
-pytest = "*"
-"-e ." = "*"
-
 [dev-packages]
 Sphinx = "*"
 numpy = "*"
 termcolor = "*"
 toml = "*"
+"-e ." = "*"
+
+[packages]
+toml = "*"
+termcolor = "*"
+pytest = "*"
 "-e ." = "*"
