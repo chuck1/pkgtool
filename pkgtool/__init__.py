@@ -574,7 +574,7 @@ class Package(object):
         self.run(('git', 'tag', 'v{}'.format(v.to_string())))
         self.run(('git', 'push', 'origin', 'v{}'.format(v.to_string())))
 
-    def commit_deploy(self, args):
+    def release(self, args):
         """
         Ensure a clean working directory and then ``pipenv install`` the latest version 
         """
@@ -587,7 +587,7 @@ class Package(object):
 
         for pkg in self.gen_local_deps():
             print(termcolor.colored(pkg.pkg, 'blue', attrs=['bold']))
-            pkg.commit_deploy(None)
+            pkg.release(None)
 
         try:
             # steps
@@ -601,10 +601,8 @@ class Package(object):
             # if clean, compare to version tag matching version in source
             if self.compare_ancestor_version():
                 print('this branch is ahead of v{}'.format(self.current_version().to_string()))
-                if input_yn('do you want to update the version number?', 'n'):
-                    self.input_version_change()
-
-                    self.upload_wheel()
+                self.input_version_change()
+                self.upload_wheel()
             
             # if not clean or at downstream commit, change version, commit, push, and upload
         except Exception as e:
@@ -657,7 +655,7 @@ class Package(object):
         self.run(('pipenv', 'install'), print_cmd=True)
         self.run(('pipenv', 'install', '-e', '.'), print_cmd=True)
 
-        self.test(None)
+        #self.test(None)
 
         self.write_requirements()
         args = ('python3', 'setup.py', 'bdist_wheel')
@@ -724,6 +722,9 @@ class Package(object):
 def commit(pkg, args):
     pkg.commit(args)
 
+def release(pkg, args):
+    pkg.release(args)
+
 def version(pkg, args):
     print(pkg.current_version().to_string())
 
@@ -751,6 +752,9 @@ def main(argv):
 
     parser_commit = subparsers.add_parser('commit')
     parser_commit.set_defaults(func=commit)
+
+    parser_release = subparsers.add_parser('release')
+    parser_release.set_defaults(func=release)
  
     parser_version = subparsers.add_parser('version')
     parser_version.set_defaults(func=version)
