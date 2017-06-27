@@ -651,7 +651,7 @@ class Package(object):
         self.run(('pipenv', '--rm'), print_cmd=True)
         self.run(('pipenv', '--three'), print_cmd=True)
         self.run(('pipenv', 'install'), print_cmd=True)
-        self.run(('pipenv', 'install', '-e', '.'), print_cmd=True)
+        self.run(('pipenv', 'install', '--dev', '-e', '.'), print_cmd=True)
 
         #self.test(None)
 

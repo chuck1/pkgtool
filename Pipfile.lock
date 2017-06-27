@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "6c0782f07fdd1964ed1f8296d55bf3023ffeeb347278e8efb6ff0e8ee31d4093"
+            "sha256": "1a1c77a7d45a791116fa72e0807fd36fafa66f2da0c4befa7946931bb44c8697"
         },
         "requires": {},
         "sources": [
@@ -12,7 +12,6 @@
         ]
     },
     "default": {
-        "-e .": "*",
         "py": {
             "version": "==1.4.34"
         },
