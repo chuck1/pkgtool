@@ -570,9 +570,25 @@ class Package(object):
         self.assert_status(set(((Package.FileStatus.Type.MODIFIED, False, fn0),)))
 
         self.run(('git', 'add', fn0))
+
+        # should we do the prereqs from build_wheel here?
+        self.reset_env_and_test()
+
         self.run(('git', 'commit', '-m', 'PKGTOOL change version from {} to {}'.format(v0.to_string(), v.to_string())))
         self.run(('git', 'tag', 'v{}'.format(v.to_string())))
         self.run(('git', 'push', 'origin', 'v{}'.format(v.to_string())))
+
+    def reset_env_and_test():
+        # reset virtualenv
+        self.run(('pipenv', '--rm'), print_cmd=True)
+        self.run(('pipenv', '--three'), print_cmd=True)
+        # install pkgtool but do not add it to Pipfile
+        self.run(('pipenv', 'run', 'pip3', 'install', 'pkgtool'), print_cmd=True)
+        self.run(('pipenv', 'install'), print_cmd=True)
+        self.run(('pipenv', 'install', '--dev', '-e', '.'), print_cmd=True)
+        self.run(('git','add','--all'))
+
+        self.test(None)
 
     def release(self, args):
         """
@@ -645,18 +661,13 @@ class Package(object):
         s = self.current_version().to_string()
         return self.pkg + '-' + s + '-py3-none-any.whl'
 
+    def auto_commit(self):
+        self.run(('git','add','--all'))
+        self.run(('git','commit','-m','minor'))
+
     def build_wheel(self):
         self.assert_head_at_version_tag()
         
-        # reset virtualenv
-        self.run(('pipenv', '--rm'), print_cmd=True)
-        self.run(('pipenv', '--three'), print_cmd=True)
-        # install pkgtool but do not add it to Pipfile
-        self.run(('pipenv', 'run', 'pip3', 'install', 'pkgtool'), print_cmd=True)
-        self.run(('pipenv', 'install'), print_cmd=True)
-        self.run(('pipenv', 'install', '--dev', '-e', '.'), print_cmd=True)
-
-        self.test(None)
 
         self.write_requirements()
         args = ('python3', 'setup.py', 'bdist_wheel')
