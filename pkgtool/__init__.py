@@ -529,7 +529,7 @@ class Package(object):
             self.print_('Pipefile entry {} does not match {}'.format(s, '>='+v))
             return False
 
-    def pipenv_install_deps(self):
+    def pipenv_install_deps(self, args):
         self.print_('local deps')
 
         for pkg in self.gen_local_deps():
@@ -555,7 +555,7 @@ class Package(object):
                 self.print_('wheel {} not in {}.'.format(wf, d2))
                 self.print_('try to build wheel...')
             
-                pkg.build_wheel()
+                pkg.build_wheel(args)
 
                 if not (wf in os.listdir(d2)):
                     e = Exception('building wheel did not produce expected wheel file...')
@@ -692,7 +692,7 @@ class Package(object):
         self.run(('git','add','--all'), print_cmd=True)
         self.run(('git','commit','-m',m), print_cmd=True)
 
-    def build_wheel(self):
+    def build_wheel(self, args):
         self.assert_head_at_version_tag()
 
         self.write_requirements()
