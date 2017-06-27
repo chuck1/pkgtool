@@ -516,7 +516,13 @@ class Package(object):
     def spec_in_pipfile(self, pipfile, pkg, v):
         if not 'packages' in pipfile: return False
         if not pkg in pipfile['packages']: return False
-        return (pipfile['packages'][pkg] == ('>=' + v))
+        
+        s = pipfile['packages'][pkg]
+        if s == ('>=' + v):
+            return True
+        else:
+            self.print_('Pipefile entry {} does not match {}'.format(s, '>='+v))
+            return False
 
     def pipenv_install_deps(self):
         self.print_('local deps')
