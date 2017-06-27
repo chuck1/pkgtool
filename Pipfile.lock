@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "9003245338e3a74eaa69ecde5486128dea5ae940448898e4420d2dbcc023ce2e"
+            "sha256": "6c0782f07fdd1964ed1f8296d55bf3023ffeeb347278e8efb6ff0e8ee31d4093"
         },
         "requires": {},
         "sources": [
@@ -61,8 +61,14 @@
         "numpy": {
             "version": "==1.13.0"
         },
+        "py": {
+            "version": "==1.4.34"
+        },
         "pygments": {
             "version": "==2.2.0"
+        },
+        "pytest": {
+            "version": "==3.1.2"
         },
         "pytz": {
             "version": "==2017.2"
