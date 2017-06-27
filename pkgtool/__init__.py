@@ -647,13 +647,16 @@ class Package(object):
 
     def build_wheel(self):
         self.assert_head_at_version_tag()
-
+        
+        # reset virtualenv
         self.run(('pipenv', '--rm'), print_cmd=True)
         self.run(('pipenv', '--three'), print_cmd=True)
+        # install pkgtool but do not add it to Pipfile
+        self.run(('pipenv', 'run', 'pip3', 'install', 'pkgtool'), print_cmd=True)
         self.run(('pipenv', 'install'), print_cmd=True)
         self.run(('pipenv', 'install', '--dev', '-e', '.'), print_cmd=True)
 
-        #self.test(None)
+        self.test(None)
 
         self.write_requirements()
         args = ('python3', 'setup.py', 'bdist_wheel')
