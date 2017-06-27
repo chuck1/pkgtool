@@ -215,7 +215,9 @@ class Package(object):
                 print(r.stdout.decode())
             if r.stderr:
                 print(r.stderr.decode())
-            raise Exception('Error in {}'.format(repr(' '.join(args))))
+            e = Exception('Error in {}'.format(repr(' '.join(args))))
+            self.print_(e)
+            raise e
         return r
     
     def run_shell(self, args, cwd=None):
