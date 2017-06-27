@@ -574,9 +574,9 @@ class Package(object):
         # should we do the prereqs from build_wheel here?
         self.reset_env_and_test()
 
-        self.run(('git', 'commit', '-m', 'PKGTOOL change version from {} to {}'.format(v0.to_string(), v.to_string())))
-        self.run(('git', 'tag', 'v{}'.format(v.to_string())))
-        self.run(('git', 'push', 'origin', 'v{}'.format(v.to_string())))
+        self.run(('git', 'commit', '-m', 'PKGTOOL change version from {} to {}'.format(v0.to_string(), v.to_string())), print_cmd=True)
+        self.run(('git', 'tag', 'v{}'.format(v.to_string())), print_cmd=True)
+        self.run(('git', 'push', 'origin', 'v{}'.format(v.to_string())), print_cmd=True)
 
     def reset_env_and_test():
         # reset virtualenv
