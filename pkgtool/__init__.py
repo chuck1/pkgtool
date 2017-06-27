@@ -702,7 +702,7 @@ class Package(object):
         self.run(('python3', 'setup.py', 'bdist_wheel'), print_cmd=True)
         
     def upload_wheel(self, args):
-        self.build_wheel()
+        self.build_wheel(args)
 
         s = self.current_version().to_string()
         
@@ -770,10 +770,10 @@ def version(pkg, args):
     print(pkg.current_version().to_string())
 
 def wheel(pkg, args):
-    pkg.build_wheel()
+    pkg.build_wheel(args)
 
 def upload(pkg, args):
-    pkg.upload_wheel()
+    pkg.upload_wheel(args)
 
 def docs(pkg, args):
     pkg.docs()
