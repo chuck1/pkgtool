@@ -417,7 +417,7 @@ class Package(object):
         for pkg in self.gen_local_deps():
             pkg.clean_working_tree(args)
         
-        if args.no_term:
+        if args.get('no_term', False):
             self.auto_commit('PKGTOOL auto commit all')
         else:
             self.git_terminal()
@@ -589,7 +589,7 @@ class Package(object):
 
     def input_version_change(self, args):
         v0 = self.current_version()
-        v = v0.prompt_change(no_input=args.no_input)
+        v = v0.prompt_change(no_input=args.get('no_input', False))
 
         fn0 = os.path.join(self.pkg, '__init__.py')
         fn = os.path.join(self.d, fn0)
@@ -634,7 +634,7 @@ class Package(object):
         
         self.print_('pkgtool')
 
-        if not args.no_recursion:
+        if not args.get('no_recursion', False):
             for pkg in self.gen_local_deps():
                 print(termcolor.colored(pkg.pkg, 'blue', attrs=['bold']))
                 pkg.release(args)
@@ -723,7 +723,7 @@ class Package(object):
         else:
             raise Exception()
         
-        self.run(('twine', 'upload', os.path.join('dist', wf)), print_cmd=True, dry_run=args.no_upload)
+        self.run(('twine', 'upload', os.path.join('dist', wf)), print_cmd=True, dry_run=args.get('no_upload', False))
 
     def read_config(self):
         with open(os.path.join(self.d, 'Pytool')) as f:
@@ -834,7 +834,7 @@ def main(argv):
     pkg = Package(args.d)
 
     try:
-        args.func(pkg, args)
+        args.func(pkg, vars(args))
     except Exception as e:
         print(e)
         raise
