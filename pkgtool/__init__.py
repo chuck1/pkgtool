@@ -621,7 +621,11 @@ class Package(object):
         self.run(('pipenv', 'run', 'pip3', 'install', 'pkgtool'), print_cmd=True)
         self.run(('pipenv', 'install'), print_cmd=True)
         self.run(('pipenv', 'install', '--dev', '-e', '.'), print_cmd=True)
+
+        self.write_requirements()
+        
         self.run(('git','add','--all'))
+
 
     def release(self, args):
         """
@@ -704,7 +708,7 @@ class Package(object):
 
         self.write_requirements()
         
-        shutil.rmtree(os.path.join(self.d, 'build'))
+        shutil.rmtree(os.path.join(self.d, 'build'), ignore_errors=True)
 
         self.run(('python3', 'setup.py', 'bdist_wheel'), print_cmd=True)
         
