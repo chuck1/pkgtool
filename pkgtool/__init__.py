@@ -621,9 +621,9 @@ class Package(object):
         #self.run(('pipenv', 'install'), print_cmd=True)
 
         self.run(('pipenv', 'update'), print_cmd=True)
+        self.write_requirements()
         self.run(('pipenv', 'install', '--dev', '-e', '.'), print_cmd=True)
 
-        self.write_requirements()
         
         self.run(('git','add','--all'))
 
@@ -682,7 +682,7 @@ class Package(object):
         self.print_('working tree is clean')
     
     def write_requirements(self):
-        r = self.run(('pipenv', 'run', 'pip3', 'freeze'))
+        r = self.run(('pipenv', 'run', 'pip3', 'freeze'), print_cmd=True)
         
         with open(os.path.join(self.d, 'requirements.txt'), 'wb') as f:
             for l in r.stdout.split(b'\n'):
