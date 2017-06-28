@@ -769,6 +769,11 @@ class Package(object):
         if d:
             self.run(('cp', '-r', 'docs/_build/html', os.path.join(d, self.pkg)))
 
+    def pipenv(self, args):
+        for pkg in self.gen_local_deps():
+            pkg.pipenv(args)
+        self.run(('pipenv','update'), print_cmd=True)
+
 def commit(pkg, args):
     pkg.commit(args)
 
@@ -789,6 +794,9 @@ def docs(pkg, args):
 
 def test(pkg, args):
     pkg.test(args)
+
+def pipenv(pkg, args):
+    pkg.pipenv(args)
 
 def main(argv):
     
@@ -826,6 +834,9 @@ def main(argv):
 
     parser_docs = subparsers.add_parser('docs')
     parser_docs.set_defaults(func=docs)
+
+    parser_pipenv = subparsers.add_parser('pipenv')
+    parser_pipenv.set_defaults(func=pipenv)
 
     print('pkgtool',__version__)
     print('argv={}'.format(argv))
