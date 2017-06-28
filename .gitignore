@@ -3,5 +3,4 @@
 build/
 dist/
 _build/
-requirements.txt
 .cache/
