@@ -615,11 +615,12 @@ class Package(object):
 
     def reset_env_and_test(self):
         # reset virtualenv
-        self.run(('pipenv', '--rm'), print_cmd=True)
-        self.run(('pipenv', '--three'), print_cmd=True)
-        # install pkgtool but do not add it to Pipfile
-        self.run(('pipenv', 'run', 'pip3', 'install', 'pkgtool'), print_cmd=True)
-        self.run(('pipenv', 'install'), print_cmd=True)
+
+        #self.run(('pipenv', '--rm'), print_cmd=True)
+        #self.run(('pipenv', '--three'), print_cmd=True)
+        #self.run(('pipenv', 'install'), print_cmd=True)
+
+        self.run(('pipenv', 'update'), print_cmd=True)
         self.run(('pipenv', 'install', '--dev', '-e', '.'), print_cmd=True)
 
         self.write_requirements()
