@@ -644,7 +644,7 @@ def commit(pkg, args):
 def release(pkg, args):
     pkg.release(args)
 
-def version(pkg, args):
+def version_(pkg, args):
     print(pkg.current_version().to_string())
 
 def wheel(pkg, args):
@@ -687,7 +687,7 @@ def main(argv):
     parser_release.set_defaults(func=release)
  
     parser_version = subparsers.add_parser('version')
-    parser_version.set_defaults(func=version)
+    parser_version.set_defaults(func=version_)
 
     parser_run = subparsers.add_parser('run')
     parser_run.add_argument('-c', '--command')
