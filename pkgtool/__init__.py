@@ -205,7 +205,11 @@ class Package(object):
             shell=False):
         if cwd is None: cwd = self.d
         
-        if print_cmd or dry_run: self.print_(' '.join(args))
+        if print_cmd or dry_run:
+            if shell:
+                self.print_(args)
+            else:
+                self.print_(' '.join(args))
         if dry_run: return
         
         r = subprocess.run(args, stdout=stdout, stderr=stderr, cwd=cwd, shell=shell)
@@ -773,7 +777,7 @@ class Package(object):
         VISITED.append(self.pkg)
 
         for pkg in self.gen_local_deps():
-            f(pkg, args)
+            pkg.foreach(args, f)
 
         f(self, args)
 
