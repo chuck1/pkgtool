@@ -1,4 +1,4 @@
-__version__ = '0.1b48'
+__version__ = '0.1b49'
 
 import argparse
 import curses
