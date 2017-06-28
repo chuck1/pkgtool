@@ -689,6 +689,10 @@ class Package(object):
                 if b'git+' in l: continue
                 f.write(l+b'\n')
 
+    def clear_requirements(self):
+        with open(os.path.join(self.d, 'requirements.txt'), 'wb') as f:
+            f.write(b'')
+
     def assert_head_at_version_tag(self):
         v = self.current_version()
         c0 = v.get_git_commit()
@@ -776,8 +780,14 @@ class Package(object):
         self.run(('pipenv','update'), print_cmd=True)
 
     def dev(self, args):
+
+        if self.pkg in VISITED: return
+        VISITED.append(self.pkg)
+
         for pkg in self.gen_local_deps():
             pkg.dev(args)
+
+        self.clear_requirements()
         self.run(('pipenv','update','--dev'), print_cmd=True)
         self.write_requirements()
 
