@@ -775,6 +775,12 @@ class Package(object):
             pkg.pipenv(args)
         self.run(('pipenv','update'), print_cmd=True)
 
+    def dev(self, args):
+        for pkg in self.gen_local_deps():
+            pkg.dev(args)
+        self.run(('pipenv','update','--dev'), print_cmd=True)
+        self.write_requirements()
+
 def commit(pkg, args):
     pkg.commit(args)
 
@@ -798,6 +804,8 @@ def test(pkg, args):
 
 def pipenv(pkg, args):
     pkg.pipenv(args)
+def dev(pkg, args):
+    pkg.dev(args)
 
 def main(argv):
     
@@ -838,6 +846,9 @@ def main(argv):
 
     parser_pipenv = subparsers.add_parser('pipenv')
     parser_pipenv.set_defaults(func=pipenv)
+
+    parser_dev = subparsers.add_parser('dev')
+    parser_dev.set_defaults(func=dev)
 
     print('pkgtool',__version__)
     print('argv={}'.format(argv))
