@@ -735,8 +735,6 @@ class Package(object):
         with open(os.path.join(self.d, c['name'], '__init__.py')) as f:
             version = re.findall("^__version__ = '(.*)'", f.read())[0]
         
-        self.write_requirements()
-
         with open(os.path.join(self.d, 'requirements.txt')) as f:
             install_requires=[l.strip() for l in f.readlines()]
     
@@ -748,7 +746,7 @@ class Package(object):
                 'author': c['author'],
                 'author_email': c['author_email'],
                 'license': c['license'],
-                'packages': c['packages'],
+                'packages': c.get('packages', []),
                 'zip_safe': False,
                 'scripts': c.get('scripts',[]),
                 'package_data': c.get('package_data',{}),
