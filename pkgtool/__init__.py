@@ -201,13 +201,14 @@ class Package(object):
         self.config = self.read_config()
         self.pkg = self.config['name']
 
-    def run(self, args, cwd=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False, dry_run=False):
+    def run(self, args, cwd=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False, dry_run=False,
+            shell=False):
         if cwd is None: cwd = self.d
         
         if print_cmd or dry_run: self.print_(' '.join(args))
         if dry_run: return
         
-        r = subprocess.run(args, stdout=stdout, stderr=stderr, cwd=cwd)
+        r = subprocess.run(args, stdout=stdout, stderr=stderr, cwd=cwd, shell=shell)
         #o, e = p.communicate()
         #print(r.stdout.decode())
         #print(r.stderr.decode())
@@ -779,6 +780,19 @@ class Package(object):
             pkg.pipenv(args)
         self.run(('pipenv','update'), print_cmd=True)
 
+    def run_(self, args):
+        c = args.get('command')
+        self.run(c, stdout=None, stderr=None, shell=True)
+
+    def foreach(self, args, f):
+        if self.pkg in VISITED: return
+        VISITED.append(self.pkg)
+
+        for pkg in self.gen_local_deps():
+            f(pkg, args)
+
+        f(self, args)
+
     def dev(self, args):
 
         if self.pkg in VISITED: return
@@ -791,6 +805,8 @@ class Package(object):
         self.run(('pipenv','update','--dev'), print_cmd=True)
         self.write_requirements()
 
+def run(pkg, args):
+    pkg.foreach(args, Package.run_)
 def commit(pkg, args):
     pkg.commit(args)
 
@@ -841,6 +857,10 @@ def main(argv):
  
     parser_version = subparsers.add_parser('version')
     parser_version.set_defaults(func=version)
+
+    parser_run = subparsers.add_parser('run')
+    parser_run.add_argument('-c', '--command')
+    parser_run.set_defaults(func=run)
 
     parser_wheel = subparsers.add_parser('wheel')
     parser_wheel.set_defaults(func=wheel)
