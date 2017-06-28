@@ -482,17 +482,11 @@ class Package(object):
         """
         :rtype: generator of Package objects
         """
-
-        self.print_('parsing dev-packages')
-
         # exploring alternate method
         pipfile = self.read_pipfile()
         for k, v in pipfile['dev-packages'].items():
             m = re.match('-e (.*)', k)
             if m:
-                self.print_(repr(k), repr(v))
-                self.print_(repr(m.group(1)))
-                
                 if m.group(1) == '.':
                     continue
 
@@ -501,16 +495,6 @@ class Package(object):
                 pkg.current_version()
                 yield pkg
         
-        return
-        with open(os.path.join(self.d, 'LOCAL_DEPS.txt')) as f:
-            for l in f:
-                l = l.strip()
-                if not l: continue
-                d = os.path.join(self.d, l)
-                pkg = Package(d)
-                pkg.current_version()
-                yield pkg
-
     def print_(self, *args):
         print(termcolor.colored('{:<16}'.format(self.pkg), 'white', attrs=['bold']), *args)
 
@@ -782,7 +766,7 @@ class Package(object):
 
     def run_(self, args):
         c = args.get('command')
-        self.run(c, stdout=None, stderr=None, shell=True)
+        self.run(c, stdout=None, stderr=None, shell=True, print_cmd=True)
 
     def foreach(self, args, f):
         if self.pkg in VISITED: return
