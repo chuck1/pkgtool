@@ -9,7 +9,6 @@ scripts = ['bin/pkgtool']
 
 packages = [
 	"pkgtool",
-	"pkgtool.tests",
 ]
 
 [package_data]
