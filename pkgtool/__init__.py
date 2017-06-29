@@ -590,8 +590,12 @@ class Package(object):
         return kwargs
     
     def test(self, args):
-        self.run(('pipenv','run','pytest'), stdout=None, stderr=None)
-        #self.run(('pipenv','run','pytest','--maxfail=1','--ff'), stdout=None, stderr=None)
+        # Create a clean environment based on Pipfile.
+        # Modules required for testing should be in dev-packages.
+        self.run(('pipenv','update','--dev'), stdout=None, stderr=None)
+
+        self.run(('pipenv','run','pytest','--maxfail=1','--ff'), stdout=None, stderr=None)
+        self.run(('pipenv','run','py.test','--cov=./'), stdout=None, stderr=None)
 
     def docs(self):
         self.run(('make', '-C', 'docs', 'html'))
