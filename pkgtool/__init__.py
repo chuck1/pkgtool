@@ -592,10 +592,10 @@ class Package(object):
     def test(self, args):
         # Create a clean environment based on Pipfile.
         # Modules required for testing should be in dev-packages.
-        self.run(('pipenv','update','--dev'), stdout=None, stderr=None)
+        self.run(('pipenv','update','--dev'), stdout=None, stderr=None, print_cmd=True)
 
-        self.run(('pipenv','run','pytest','--maxfail=1','--ff'), stdout=None, stderr=None)
-        self.run(('pipenv','run','py.test','--cov=./'), stdout=None, stderr=None)
+        self.run(('pipenv','run','pytest','--maxfail=1','--ff'), stdout=None, stderr=None, print_cmd=True)
+        self.run(('pipenv','run','py.test','--cov=./'), stdout=None, stderr=None, print_cmd=True)
 
     def docs(self):
         self.run(('make', '-C', 'docs', 'html'))
