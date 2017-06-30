@@ -600,6 +600,7 @@ class Package(object):
     def docs(self):
         self.run(('make', '-C', 'docs', 'html'), print_cmd=True)
         self.run(('make', '-C', 'docs', 'coverage'), print_cmd=True)
+        self.run(('make', '-C', 'docs', 'doctest'), print_cmd=True)
         d = os.environ.get('LOCAL_DOCS_DIR', None)
         if d:
             self.run(('cp', '-r', 'docs/_build/html', os.path.join(d, self.pkg)))
