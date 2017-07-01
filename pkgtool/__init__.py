@@ -443,14 +443,12 @@ class Package(object):
         # reset virtualenv
 
         #self.run(('pipenv', '--rm'), print_cmd=True)
-        #self.run(('pipenv', '--three'), print_cmd=True)
-        #self.run(('pipenv', 'install'), print_cmd=True)
-
-        self.run(('pipenv', 'update'), print_cmd=True)
+        
+        self.run(('pipenv', '--three'), print_cmd=True)
+        self.run(('pipenv', 'install'), print_cmd=True)
         self.write_requirements()
         self.run(('pipenv', 'install', '--dev', '-e', '.'), print_cmd=True)
 
-        
         self.run(('git','add','--all'))
 
 
