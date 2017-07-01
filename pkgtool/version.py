@@ -81,6 +81,10 @@ class Version(object):
         n = int(m.group(2))
         return Version.PreRelease(s, n)
 
+    def input_add_pre(self):
+        pre = self.input_pre()
+        return Version(sdlf.rel, pre)
+    
     def input_next_add_pre(self, i):
         pre = self.input_pre()
         return self.next(i, pre)
@@ -103,6 +107,8 @@ class Version(object):
         if self.pre:
             yield Option(self.next_pre)
             yield Option(self.remove_pre)
+        else:
+            yield Option(self.input_add_pre, 'add pre')
 
         for i in range(len(self.rel)):
             yield Option(functools.partial(self.input_next_add_pre, i), self.next(i).to_string())
