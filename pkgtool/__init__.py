@@ -368,7 +368,7 @@ class Package(object):
         for pkg in self.gen_local_deps():
 
             v_string = pkg.current_version().to_string()
-            spec = pkg.pkg + '>=' + v_string
+            spec = pkg.pkg + '==' + v_string
  
             pipfile = self.read_pipfile()
             
@@ -435,7 +435,8 @@ class Package(object):
         # should we do the prereqs from build_wheel here?
         self.reset_env_and_test()
 
-        self.run(('git', 'commit', '-m', 'PKGTOOL change version from {} to {}'.format(v0.to_string(), v.to_string())), print_cmd=True)
+        self.run(('git', 'commit', '-m', 'PKGTOOL change version from {} to {}'.format(
+            v0.to_string(), v.to_string())), print_cmd=True)
         self.run(('git', 'tag', 'v{}'.format(v.to_string())), print_cmd=True)
         self.run(('git', 'push', 'origin', 'v{}'.format(v.to_string())), print_cmd=True)
 
@@ -447,10 +448,8 @@ class Package(object):
         self.run(('pipenv', '--three'), print_cmd=True)
         self.run(('pipenv', 'install'), print_cmd=True)
         self.write_requirements()
-        self.run(('pipenv', 'install', '--dev', '-e', '.'), print_cmd=True)
 
         self.run(('git','add','--all'))
-
 
     def release(self, args):
         """
@@ -562,6 +561,7 @@ class Package(object):
         with open(os.path.join(self.d, 'Pytool')) as f:
             c = toml.loads(f.read())
         return c
+
     def setup_args(self):
         c = self.read_config()
         
@@ -590,10 +590,13 @@ class Package(object):
     def test(self, args):
         # Create a clean environment based on Pipfile.
         # Modules required for testing should be in dev-packages.
-        self.run(('pipenv','update','--dev'), stdout=None, stderr=None, print_cmd=True)
+        self.run(('pipenv','--three'), stdout=None, stderr=None, print_cmd=True)
+        self.run(('pipenv','install', '--dev'), stdout=None, stderr=None, print_cmd=True)
 
         self.run(('pipenv','run','pytest','--maxfail=1','--ff'), stdout=None, stderr=None, print_cmd=True)
         self.run(('pipenv','run','py.test','--cov=./'), stdout=None, stderr=None, print_cmd=True)
+
+        self.docs()
 
     def docs(self):
         self.run(('make', '-C', 'docs', 'html'), print_cmd=True)
@@ -612,35 +615,23 @@ class Package(object):
         c = args.get('command')
         self.run(c, stdout=None, stderr=None, shell=True, print_cmd=True)
 
-    def foreach(self, args, f):
+    @staticmethod
+    def foreach(f, self, args):
         if self.pkg in VISITED: return
         VISITED.append(self.pkg)
 
         for pkg in self.gen_local_deps():
-            pkg.foreach(args, f)
+            Package.foreach(f, pkg, args)
 
         f(self, args)
 
     def dev(self, args):
-
-        if self.pkg in VISITED: return
-        VISITED.append(self.pkg)
-
-        for pkg in self.gen_local_deps():
-            pkg.dev(args)
-
-        self.clear_requirements()
-        self.run(('pipenv','update','--dev'), print_cmd=True)
-        self.write_requirements()
+        self.run(('pipenv','--three'), print_cmd=True)
+        self.run(('pipenv','install','--dev'), print_cmd=True)
     
-    def _req(self, args):
+    def req(self, args):
         self.write_requirements()
 
-    def req(self, args):
-        self.foreach(args, Package._req)
-
-def run(pkg, args):
-    pkg.foreach(args, Package.run_)
 def commit(pkg, args):
     pkg.commit(args)
 
@@ -664,8 +655,6 @@ def test(pkg, args):
 
 def pipenv(pkg, args):
     pkg.pipenv(args)
-def dev(pkg, args):
-    pkg.dev(args)
 
 def main(argv):
     
@@ -694,7 +683,7 @@ def main(argv):
 
     parser_run = subparsers.add_parser('run')
     parser_run.add_argument('-c', '--command')
-    parser_run.set_defaults(func=run)
+    parser_run.set_defaults(func=functools.partial(Package.foreach, Package.dev))
 
     parser_wheel = subparsers.add_parser('wheel')
     parser_wheel.set_defaults(func=wheel)
@@ -712,11 +701,10 @@ def main(argv):
     parser_pipenv.set_defaults(func=pipenv)
 
     parser_dev = subparsers.add_parser('dev')
-    parser_dev.set_defaults(func=dev)
+    parser_dev.set_defaults(func=functools.partial(Package.foreach, Package.dev))
 
     parser_req = subparsers.add_parser('req')
-    parser_req.set_defaults(func=Package.req)
-
+    parser_req.set_defaults(func=functools.partial(Package.foreach, Package.req))
 
     print('pkgtool',__version__)
     print('argv={}'.format(argv))

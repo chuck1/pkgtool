@@ -107,8 +107,6 @@ class Version(object):
         if self.pre:
             yield Option(self.next_pre)
             yield Option(self.remove_pre)
-        else:
-            yield Option(self.input_add_pre, 'add pre')
 
         for i in range(len(self.rel)):
             yield Option(functools.partial(self.input_next_add_pre, i), self.next(i).to_string())
