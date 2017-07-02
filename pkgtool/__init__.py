@@ -255,18 +255,18 @@ class Package(object):
             
             r = self.run(('git', 'commit', '-F', tf.name, '--cleanup=strip'))
 
+    def assert_clean(self):
+        if not self.is_clean():
+            self.print_('not clean')
+            raise AssertionError()
+
     def clean_working_tree(self, args):
-        for pkg in self.gen_local_deps():
-            pkg.clean_working_tree(args)
-        
         if args.get('no_term', False):
             self.auto_commit('PKGTOOL auto commit all')
         else:
             self.git_terminal()
         
-        r = self.run(('git', 'status', '--porcelain'))
-        if r.stdout:
-            raise Exception('working tree not clean')
+        self.assert_clean()
     
     def is_clean(self):
         r = self.run(('git', 'status', '--porcelain'))
@@ -490,16 +490,6 @@ class Package(object):
             #sys.exit(1)
 
     def commit(self, args):
-        if self.pkg in VISITED:
-            return
-        VISITED.append(self.pkg)
-        
-        self.print_('pkgtool')
-
-        for pkg in self.gen_local_deps():
-            print(termcolor.colored(pkg.pkg, 'blue', attrs=['bold']))
-            pkg.commit(args)
-
         # make sure working tree is clean
         self.clean_working_tree(args)
         self.print_('working tree is clean')
@@ -590,14 +580,31 @@ class Package(object):
     def test(self, args):
         # Create a clean environment based on Pipfile.
         # Modules required for testing should be in dev-packages.
-        self.run(('pipenv','--three'), stdout=None, stderr=None, print_cmd=True)
-        self.run(('pipenv','install', '--dev'), stdout=None, stderr=None, print_cmd=True)
+        
+        self.assert_clean()
+
+        c = self.get_git_commit_HEAD().decode()
+        f = os.path.join(self.d, '.dev', 'test', c)
+        if os.path.exists(f):
+            self.print_('tests already passed')
+            return
+
+        self.dev(args)
 
         self.run(('pipenv','run','pytest','--maxfail=1','--ff'), stdout=None, stderr=None, print_cmd=True)
         self.run(('pipenv','run','py.test','--cov=./'), stdout=None, stderr=None, print_cmd=True)
 
-        self.docs()
+        try:
+            os.makedirs(os.path.dirname(f))
+        except: pass
+        with open(f, 'w') as fd:
+            fd.write(' ')
 
+    def dev(self, args):
+        self.run(('pipenv','--three'), stdout=None, stderr=None, print_cmd=True)
+        self.run(('pipenv','run','pip3','install','-r','requirements_setup.txt'), stdout=None, stderr=None, print_cmd=True)
+        self.run(('pipenv','install','--dev'), stdout=None, stderr=None, print_cmd=True)
+        
     def docs(self):
         self.run(('make', '-C', 'docs', 'html'), print_cmd=True)
         self.run(('make', '-C', 'docs', 'coverage'), print_cmd=True)
@@ -606,14 +613,12 @@ class Package(object):
         if d:
             self.run(('cp', '-r', 'docs/_build/html', os.path.join(d, self.pkg)))
 
-    def pipenv(self, args):
-        for pkg in self.gen_local_deps():
-            pkg.pipenv(args)
-        self.run(('pipenv','update'), print_cmd=True)
-
     def run_(self, args):
         c = args.get('command')
         self.run(c, stdout=None, stderr=None, shell=True, print_cmd=True)
+
+    def req(self, args):
+        self.write_requirements()
 
     @staticmethod
     def foreach(f, self, args):
@@ -624,17 +629,7 @@ class Package(object):
             Package.foreach(f, pkg, args)
 
         f(self, args)
-
-    def dev(self, args):
-        self.run(('pipenv','--three'), print_cmd=True)
-        self.run(('pipenv','install','--dev'), print_cmd=True)
     
-    def req(self, args):
-        self.write_requirements()
-
-def commit(pkg, args):
-    pkg.commit(args)
-
 def release(pkg, args):
     pkg.release(args)
 
@@ -669,7 +664,7 @@ def main(argv):
     parser.set_defaults(func=help_)
 
     parser_commit = subparsers.add_parser('commit')
-    parser_commit.set_defaults(func=commit)
+    parser_commit.set_defaults(func=functools.partial(Package.foreach, Package.commit))
 
     parser_release = subparsers.add_parser('release')
     parser_release.add_argument('--no-upload', action='store_true', dest='no_upload')
@@ -683,7 +678,7 @@ def main(argv):
 
     parser_run = subparsers.add_parser('run')
     parser_run.add_argument('-c', '--command')
-    parser_run.set_defaults(func=functools.partial(Package.foreach, Package.dev))
+    parser_run.set_defaults(func=functools.partial(Package.foreach, Package.run_))
 
     parser_wheel = subparsers.add_parser('wheel')
     parser_wheel.set_defaults(func=wheel)
@@ -692,13 +687,10 @@ def main(argv):
     parser_upload.set_defaults(func=upload)
 
     parser_test = subparsers.add_parser('test')
-    parser_test.set_defaults(func=test)
+    parser_test.set_defaults(func=functools.partial(Package.foreach, Package.test))
 
     parser_docs = subparsers.add_parser('docs')
     parser_docs.set_defaults(func=docs)
-
-    parser_pipenv = subparsers.add_parser('pipenv')
-    parser_pipenv.set_defaults(func=pipenv)
 
     parser_dev = subparsers.add_parser('dev')
     parser_dev.set_defaults(func=functools.partial(Package.foreach, Package.dev))
@@ -706,12 +698,7 @@ def main(argv):
     parser_req = subparsers.add_parser('req')
     parser_req.set_defaults(func=functools.partial(Package.foreach, Package.req))
 
-    print('pkgtool',__version__)
-    print('argv={}'.format(argv))
-
     args = parser.parse_args(argv[1:])
-
-    print('d={}'.format(repr(args.d)))
 
     # TODO use args to possible use different directory
     pkg = Package(args.d)
