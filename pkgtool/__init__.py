@@ -4,6 +4,7 @@ import argparse
 import curses
 import enum
 import functools
+import json
 import re
 import os
 import sys
@@ -37,6 +38,10 @@ class Package(object):
         self.d = d
         self.config = self.read_config()
         self.pkg = self.config['name']
+
+        self._path_pipfile = None
+        self._path_pipfile_lock = None
+        self._pipfile_lock = None
 
     def run(self, args, cwd=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False, dry_run=False,
             shell=False):
@@ -77,6 +82,124 @@ class Package(object):
         #o, e = p.communicate()
         print(' '.join(args))
         return r
+
+    @property
+    def path_pipfile(self):
+        if not self._path_pipfile:
+            self._path_pipfile = os.path.join(self.d, 'Pipfile')
+        return self._path_pipfile
+
+    @property
+    def path_pipfile_lock(self):
+        if not self._path_pipfile_lock:
+            self._path_pipfile_lock = os.path.join(self.d, 'Pipfile.lock')
+        return self._path_pipfile_lock
+
+    @property
+    def pipfile_lock(self):
+        b = (os.path.getmtime(self.path_pipfile) > os.path.getmtime(self.path_pipfile_lock))
+        if (not self._pipfile_lock) or b:
+            if b:
+                # Pipfile.lock is out of date
+                self.run(('pipenv', 'lock'), print_cmd=True)
+        
+            with open('Pipfile.lock') as f:
+                self._pipfile_lock = json.loads(f.read())
+
+        return self._pipfile_lock
+
+    def gen_pipfile_lock(self, args):
+
+        yield from self.requirements_setup
+
+        for k, v in self.pipfile_lock['default'].items():
+            yield k, v['version']
+
+        if args.get('dev', False):
+            for k, v in self.pipfile_lock['develop'].items():
+                self.print_(repr(k), repr(v))
+                if v == '*':
+                    yield k, v
+                    continue
+                yield k.lower(), v['version']
+
+    def gen_freeze(self):
+        r = self.run(('pipenv', 'run', 'pip3', 'freeze'), print_cmd=True)
+        l1 = r.stdout.decode().split('\n')
+        for l in l1:
+            if not l: continue
+            self.print_(l)
+
+            m = re.match('^-e .*$', l)
+            if m:
+                continue
+
+            m = re.match('^([\w-]+)(.*)$', l)
+            yield m.group(1).lower(), m.group(2)
+    
+    @property
+    def requirements_setup(self):
+        with open(os.path.join(self.d, 'requirements_setup.txt')) as f:
+            lst = f.read().split('\n')
+        for l in lst:
+            if not l: continue
+            m = re.match('^([\w-]+)(.*)$', l)
+            yield m.group(1).lower(), m.group(2)
+    
+    def pip_install(self, name, version):
+        self.run(('pipenv', 'run', 'pip3', 'install', name + version, '-y'), print_cmd=True)
+
+    def pip_uninstall(self, name):
+        self.run(('pipenv', 'run', 'pip3', 'uninstall', name, '-y'), 
+                stdout=None, stderr=None, print_cmd=True)
+        
+    def compare_pipfile_lock_to_freeze(self, args):
+        deps1 = dict(self.gen_freeze())
+        deps2 = dict(self.gen_pipfile_lock(args))
+
+        def gen_diff(keys, d1, d2):
+            for k in keys:
+                if not d2[k]:
+                    continue
+
+                if d1[k] != d2[k]:
+                    self.print_('differ: {} installed={} require={}'.format(
+                        k, repr(d1[k]), repr(d2[k])))
+                    yield k
+        
+        keys1 = set(deps1.keys())
+        keys2 = set(deps2.keys())
+        
+        keys2 -= set(['setuptools'])
+        
+        keys_install = keys2 - keys1
+        keys_uninstall = keys1 - keys2
+
+        self.print_('install: {}'.format(keys2 - keys1))
+        self.print_('uninstall: {}'.format(keys1 - keys2))
+        
+        keys_update = gen_diff(keys1.intersection(keys2), deps1, deps2)
+        
+        deps_install = [(k, deps2[k]) for k in keys_install]
+
+        deps_update = [(k, deps2[k]) for k in keys_update]
+    
+        return keys_uninstall, deps_install, deps_update
+
+    def do_check_install(self, args):
+        keys_uninstall, deps_install, deps_update = self.compare_pipfile_lock_to_freeze(args)
+
+    def do_install(self, args):
+        keys_uninstall, deps_install, deps_update = self.compare_pipfile_lock_to_freeze(args)
+
+        for k in keys_uninstall:
+            self.pip_uninstall(k)
+        
+        for k, v in deps_install:
+            self.pip_install(k, v)
+            
+        for k in deps_update:
+            self.pip_install(k, v)
 
     def read_pipfile(self):
         with open(os.path.join(self.d, 'Pipfile')) as f:
@@ -264,7 +387,8 @@ class Package(object):
         if args.get('no_term', False):
             self.auto_commit('PKGTOOL auto commit all')
         else:
-            self.git_terminal()
+            if not self.is_clean():
+                self.git_terminal()
         
         self.assert_clean()
     
@@ -602,7 +726,8 @@ class Package(object):
 
     def dev(self, args):
         self.run(('pipenv','--three'), stdout=None, stderr=None, print_cmd=True)
-        self.run(('pipenv','run','pip3','install','-r','requirements_setup.txt'), stdout=None, stderr=None, print_cmd=True)
+        self.run(('pipenv','run','pip3','install','-r','requirements_setup.txt'), 
+                stdout=None, stderr=None, print_cmd=True)
         self.run(('pipenv','install','--dev'), stdout=None, stderr=None, print_cmd=True)
         
     def docs(self):
@@ -635,6 +760,7 @@ def release(pkg, args):
 
 def version_(pkg, args):
     print(pkg.current_version().to_string())
+    pkg.compare_pipfile_lock_to_freeze(args)
 
 def wheel(pkg, args):
     pkg.build_wheel(args)
@@ -675,6 +801,22 @@ def main(argv):
  
     parser_version = subparsers.add_parser('version')
     parser_version.set_defaults(func=version_)
+    
+    commands = [
+            ('test', Package.test, []),
+            ('install', Package.do_install, [
+                (('--dev',), {'action':'store_true'}),
+                    ]),
+            ('check_install', Package.do_check_install, [
+                (('--dev',), {'action':'store_true'}),
+                    ]),
+            ]
+    
+    for s, f, arguments in commands:
+        subparser = subparsers.add_parser(s)
+        for args, kwargs in arguments:
+            subparser.add_argument(*args, **kwargs)
+        subparser.set_defaults(func=functools.partial(Package.foreach, f))
 
     parser_run = subparsers.add_parser('run')
     parser_run.add_argument('-c', '--command')
@@ -685,9 +827,6 @@ def main(argv):
 
     parser_upload = subparsers.add_parser('upload')
     parser_upload.set_defaults(func=upload)
-
-    parser_test = subparsers.add_parser('test')
-    parser_test.set_defaults(func=functools.partial(Package.foreach, Package.test))
 
     parser_docs = subparsers.add_parser('docs')
     parser_docs.set_defaults(func=docs)
