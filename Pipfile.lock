@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "5ade4da71796526f3dabf722f4cac31d8e72408e1df326aa101d2c2cc428de3b"
+            "sha256": "d4b8b6c716989628a99172862df425b23890489cb77261e1560e91855833e6fd"
         },
         "requires": {},
         "sources": [
@@ -12,15 +12,6 @@
         ]
     },
     "default": {
-        "py": {
-            "version": "==1.4.34"
-        },
-        "pytest": {
-            "version": "==3.1.2"
-        },
-        "setuptools": {
-            "version": "==36.0.1"
-        },
         "termcolor": {
             "version": "==1.1.0"
         },
@@ -85,16 +76,10 @@
             "version": "==1.2.1"
         },
         "sphinx": {
-            "version": "==1.6.2"
+            "version": "==1.6.3"
         },
         "sphinxcontrib-websupport": {
             "version": "==1.0.1"
-        },
-        "termcolor": {
-            "version": "==1.1.0"
-        },
-        "toml": {
-            "version": "==0.9.2"
         },
         "urllib3": {
             "version": "==1.21.1"
