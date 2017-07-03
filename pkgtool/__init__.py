@@ -38,6 +38,7 @@ class Package(object):
         self.d = d
         self.config = self.read_config()
         self.pkg = self.config['name']
+        self.name = self.config['name']
 
         self._path_pipfile = None
         self._path_pipfile_lock = None
@@ -103,35 +104,54 @@ class Package(object):
                 # Pipfile.lock is out of date
                 self.run(('pipenv', 'lock'), print_cmd=True)
         
-            with open('Pipfile.lock') as f:
+            with open(self.path_pipfile_lock) as f:
                 self._pipfile_lock = json.loads(f.read())
 
         return self._pipfile_lock
 
     def gen_pipfile_lock(self, args):
 
-        yield from self.requirements_setup
+        deps = dict(self.requirements_setup)
 
         for k, v in self.pipfile_lock['default'].items():
-            yield k, v['version']
+            k = k.replace('_', '-')
+            deps[k] = v['version']
 
         if args.get('dev', False):
             for k, v in self.pipfile_lock['develop'].items():
-                self.print_(repr(k), repr(v))
-                if v == '*':
-                    yield k, v
+                #self.print_(repr(k), repr(v))
+                
+                m = re.match('-e ([-\./\w]+)$', k)
+                if m:
+                    #self.print_('local install {} {}'.format(repr(k), repr(v)))
+                    d = os.path.normpath(os.path.join(self.d, m.group(1)))
+                    #self.print_(d)
+                    pkg = Package(d)
+                    deps[pkg.name] = 'local ' + d
                     continue
-                yield k.lower(), v['version']
+                    
+                if k.startswith('-e'):
+                    raise Exception('undetected local install ' + repr(k) + ' ' + repr(v))
+
+                if v == '*':
+                    deps[k] = v
+                    continue
+
+                deps[k.lower()] = v['version']
+        return deps
 
     def gen_freeze(self):
         r = self.run(('pipenv', 'run', 'pip3', 'freeze'), print_cmd=True)
         l1 = r.stdout.decode().split('\n')
         for l in l1:
             if not l: continue
-            self.print_(l)
+            #self.print_(l)
 
-            m = re.match('^-e .*$', l)
+            m = re.match('^-e (.*)egg=(\w+)$', l)
             if m:
+                self.print_('freeze local install {}'.format(repr(m.group(2))))
+                #raise Exception('local install')
+                yield m.group(2), 'local'
                 continue
 
             m = re.match('^([\w-]+)(.*)$', l)
@@ -146,14 +166,23 @@ class Package(object):
             m = re.match('^([\w-]+)(.*)$', l)
             yield m.group(1).lower(), m.group(2)
     
+    def pipenv_run(self, cmd, *args, **kwargs):
+        self.run(('pipenv', 'run') + cmd, *args, **kwargs)
+
     def pip_install(self, name, version):
-        self.run(('pipenv', 'run', 'pip3', 'install', name + version, '-y'), print_cmd=True)
+        if version.startswith('local '):
+            self.pipenv_run(('pip3', 'install', '-e', version[6:]), print_cmd=True)
+            return
+        
+        self.print_('{} {}'.format(repr(name), repr(version)))
+        self.run(('pipenv', 'run', 'pip3', 'install', name + version), print_cmd=True)
 
     def pip_uninstall(self, name):
         self.run(('pipenv', 'run', 'pip3', 'uninstall', name, '-y'), 
-                stdout=None, stderr=None, print_cmd=True)
+                print_cmd=True)
         
     def compare_pipfile_lock_to_freeze(self, args):
+        assert args is not None
         deps1 = dict(self.gen_freeze())
         deps2 = dict(self.gen_pipfile_lock(args))
 
@@ -161,6 +190,10 @@ class Package(object):
             for k in keys:
                 if not d2[k]:
                     continue
+                
+                if d1[k].startswith('local') and d2[k].startswith('local'):
+                    continue
+                    
 
                 if d1[k] != d2[k]:
                     self.print_('differ: {} installed={} require={}'.format(
@@ -198,7 +231,7 @@ class Package(object):
         for k, v in deps_install:
             self.pip_install(k, v)
             
-        for k in deps_update:
+        for k, v in deps_update:
             self.pip_install(k, v)
 
     def read_pipfile(self):
@@ -455,7 +488,7 @@ class Package(object):
                 if m.group(1) == '.':
                     continue
 
-                d = os.path.join(self.d, m.group(1))
+                d = os.path.normpath(os.path.join(self.d, m.group(1)))
                 pkg = Package(d)
                 pkg.current_version()
                 yield pkg
@@ -725,11 +758,18 @@ class Package(object):
             fd.write(' ')
 
     def dev(self, args):
-        self.run(('pipenv','--three'), stdout=None, stderr=None, print_cmd=True)
-        self.run(('pipenv','run','pip3','install','-r','requirements_setup.txt'), 
-                stdout=None, stderr=None, print_cmd=True)
-        self.run(('pipenv','install','--dev'), stdout=None, stderr=None, print_cmd=True)
+        """
+        setup dev environment
+        """
+        #self.run(('pipenv','--three'), stdout=None, stderr=None, print_cmd=True)
+        #self.run(('pipenv','run','pip3','install','-r','requirements_setup.txt'), 
+        #        stdout=None, stderr=None, print_cmd=True)
+        #self.run(('pipenv','install','--dev'), stdout=None, stderr=None, print_cmd=True)
         
+        a = dict(args)
+        a.update({'dev':True})
+        self.do_install(a)
+
     def docs(self):
         self.run(('make', '-C', 'docs', 'html'), print_cmd=True)
         self.run(('make', '-C', 'docs', 'coverage'), print_cmd=True)
@@ -747,6 +787,8 @@ class Package(object):
 
     @staticmethod
     def foreach(f, self, args):
+        assert args is not None
+
         if self.pkg in VISITED: return
         VISITED.append(self.pkg)
 
@@ -830,9 +872,6 @@ def main(argv):
 
     parser_docs = subparsers.add_parser('docs')
     parser_docs.set_defaults(func=docs)
-
-    parser_dev = subparsers.add_parser('dev')
-    parser_dev.set_defaults(func=functools.partial(Package.foreach, Package.dev))
 
     parser_req = subparsers.add_parser('req')
     parser_req.set_defaults(func=functools.partial(Package.foreach, Package.req))
