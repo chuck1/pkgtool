@@ -40,9 +40,21 @@ class Package(object):
         self.pkg = self.config['name']
         self.name = self.config['name']
 
+        self._path_setup = None
+        self._path_setup_lock = None
         self._path_pipfile = None
         self._path_pipfile_lock = None
         self._pipfile_lock = None
+
+    def lock(self, args):
+        if os.path.exists(self.path_setup_lock):
+            if os.path.getmtime(self.path_setup_lock) > os.path.getmtime(self.path_setup):
+                return
+            
+        with open(self.path_setup) as f:
+            s = toml.loads(f.read())
+        with open(self.path_setup_lock, 'w') as f:
+            f.write(json.dumps(s, indent=4))
 
     def run(self, args, cwd=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False, dry_run=False,
             shell=False):
@@ -85,6 +97,18 @@ class Package(object):
         return r
 
     @property
+    def path_setup(self):
+        if not self._path_setup:
+            self._path_setup = os.path.join(self.d, 'Pytool')
+        return self._path_setup
+
+    @property
+    def path_setup_lock(self):
+        if not self._path_setup_lock:
+            self._path_setup_lock = os.path.join(self.d, 'Setup.lock')
+        return self._path_setup_lock
+
+    @property
     def path_pipfile(self):
         if not self._path_pipfile:
             self._path_pipfile = os.path.join(self.d, 'Pipfile')
@@ -109,54 +133,6 @@ class Package(object):
 
         return self._pipfile_lock
 
-    def gen_pipfile_lock(self, args):
-
-        deps = dict(self.requirements_setup)
-
-        for k, v in self.pipfile_lock['default'].items():
-            k = k.replace('_', '-')
-            deps[k] = v['version']
-
-        if args.get('dev', False):
-            for k, v in self.pipfile_lock['develop'].items():
-                #self.print_(repr(k), repr(v))
-                
-                m = re.match('-e ([-\./\w]+)$', k)
-                if m:
-                    #self.print_('local install {} {}'.format(repr(k), repr(v)))
-                    d = os.path.normpath(os.path.join(self.d, m.group(1)))
-                    #self.print_(d)
-                    pkg = Package(d)
-                    deps[pkg.name] = 'local ' + d
-                    continue
-                    
-                if k.startswith('-e'):
-                    raise Exception('undetected local install ' + repr(k) + ' ' + repr(v))
-
-                if v == '*':
-                    deps[k] = v
-                    continue
-
-                deps[k.lower()] = v['version']
-        return deps
-
-    def gen_freeze(self):
-        r = self.run(('pipenv', 'run', 'pip3', 'freeze'), print_cmd=True)
-        l1 = r.stdout.decode().split('\n')
-        for l in l1:
-            if not l: continue
-            #self.print_(l)
-
-            m = re.match('^-e (.*)egg=(\w+)$', l)
-            if m:
-                self.print_('freeze local install {}'.format(repr(m.group(2))))
-                #raise Exception('local install')
-                yield m.group(2), 'local'
-                continue
-
-            m = re.match('^([\w-]+)(.*)$', l)
-            yield m.group(1).lower(), m.group(2)
-    
     @property
     def requirements_setup(self):
         with open(os.path.join(self.d, 'requirements_setup.txt')) as f:
@@ -181,59 +157,6 @@ class Package(object):
         self.run(('pipenv', 'run', 'pip3', 'uninstall', name, '-y'), 
                 print_cmd=True)
         
-    def compare_pipfile_lock_to_freeze(self, args):
-        assert args is not None
-        deps1 = dict(self.gen_freeze())
-        deps2 = dict(self.gen_pipfile_lock(args))
-
-        def gen_diff(keys, d1, d2):
-            for k in keys:
-                if not d2[k]:
-                    continue
-                
-                if d1[k].startswith('local') and d2[k].startswith('local'):
-                    continue
-                    
-
-                if d1[k] != d2[k]:
-                    self.print_('differ: {} installed={} require={}'.format(
-                        k, repr(d1[k]), repr(d2[k])))
-                    yield k
-        
-        keys1 = set(deps1.keys())
-        keys2 = set(deps2.keys())
-        
-        keys2 -= set(['setuptools'])
-        
-        keys_install = keys2 - keys1
-        keys_uninstall = keys1 - keys2
-
-        self.print_('install: {}'.format(keys2 - keys1))
-        self.print_('uninstall: {}'.format(keys1 - keys2))
-        
-        keys_update = gen_diff(keys1.intersection(keys2), deps1, deps2)
-        
-        deps_install = [(k, deps2[k]) for k in keys_install]
-
-        deps_update = [(k, deps2[k]) for k in keys_update]
-    
-        return keys_uninstall, deps_install, deps_update
-
-    def do_check_install(self, args):
-        keys_uninstall, deps_install, deps_update = self.compare_pipfile_lock_to_freeze(args)
-
-    def do_install(self, args):
-        keys_uninstall, deps_install, deps_update = self.compare_pipfile_lock_to_freeze(args)
-
-        for k in keys_uninstall:
-            self.pip_uninstall(k)
-        
-        for k, v in deps_install:
-            self.pip_install(k, v)
-            
-        for k, v in deps_update:
-            self.pip_install(k, v)
-
     def read_pipfile(self):
         with open(os.path.join(self.d, 'Pipfile')) as f:
             config = toml.loads(f.read())
@@ -259,9 +182,13 @@ class Package(object):
             
             if m:
                 print('  {}'.format(repr(m.group(1))))
-                if m.group(1) == ' M':
+                if m.group(1) == 'A ':
+                    yield Package.FileStatus.Type.UNTRACKED, True, m.group(2)
+                elif m.group(1) == ' M':
                     yield Package.FileStatus.Type.MODIFIED, False, m.group(2)
                 elif m.group(1) == 'M ':
+                    yield Package.FileStatus.Type.MODIFIED, True, m.group(2)
+                elif m.group(1) == 'MM':
                     yield Package.FileStatus.Type.MODIFIED, True, m.group(2)
                 elif m.group(1) == ' D':
                     yield Package.FileStatus.Type.DELETED, False, m.group(2)
@@ -270,6 +197,7 @@ class Package(object):
                 elif m.group(1) == '??':
                     yield Package.FileStatus.Type.UNTRACKED, False, m.group(2)
                 else:
+                    self.print_('unhandled code: {}'.format(repr(m.group(1))))
                     raise Exception('unhandled code: {}'.format(repr(m.group(1))))
 
     class FileStatus(object):
@@ -496,36 +424,47 @@ class Package(object):
     def print_(self, *args):
         print(termcolor.colored('{:<16}'.format(self.pkg), 'white', attrs=['bold']), *args)
 
-    def spec_in_pipfile(self, pipfile, pkg, v):
+    def spec_in_pipfile(self, pipfile, name, sped):
         if not 'packages' in pipfile:
             self.print_('Pipfile does not have a \'packages\' attribute')
             return False
         
-        pkg1 = pkg.replace('_','-')
-        pkg2 = pkg.replace('-','_')
+        name1 = name.replace('_','-')
+        name2 = name.replace('-','_')
 
-        if pkg1 in pipfile['packages']:
-            pkg = pkg1
-        elif pkg2 in pipfile['packages']:
-            pkg = pkg2
+        if name1 in pipfile['packages']:
+            name = name1
+        elif name2 in pipfile['packages']:
+            name = name2
         else:
-            self.print_('Pipfile \'packages\' does not contain {} or {}'.format(repr(pkg1), repr(pkg2)))
+            self.print_('Pipfile \'packages\' does not contain {} or {}'.format(repr(name1), repr(name2)))
             return False
         
-        s = pipfile['packages'][pkg]
-        if s == ('>=' + v):
+        s = pipfile['packages'][name]
+        if s == spec:
             return True
         else:
-            self.print_('Pipefile entry {} does not match {}'.format(s, '>='+v))
+            self.print_('Pipefile entry {} does not match {}'.format(s, spec))
             return False
 
+    def modify_pipfile(self, deps):
+        with open(self.path_pipfile) as f:
+            p = toml.loads(f.read())
+        for k, v in deps:
+            p['packages'][k] = v
+        with open(self.path_pipfile, 'w') as f:
+            f.write(toml.dumps())
+        self.run(('pipenv','lock'))
+        
     def pipenv_install_deps(self, args):
         self.print_('local deps')
+
+        deps = {}
 
         for pkg in self.gen_local_deps():
 
             v_string = pkg.current_version().to_string()
-            spec = pkg.pkg + '==' + v_string
+            spec = '==' + v_string
  
             pipfile = self.read_pipfile()
             
@@ -552,18 +491,19 @@ class Package(object):
                     self.print_(e)
                     raise e
 
-            self.run(('pipenv', 'install', os.path.join(d2, wf)), print_cmd=True)
-            self.run(('pipenv', 'install', spec), print_cmd=True)
+            deps[pkg.name] = spec
 
-            s_lines = list(self.git_status_lines())
-            if s_lines:
-                if not (len(s_lines) == 1):
-                    Exception(str(s_lines))
-                if not ((s_lines[0][0] == 'M') and (s_lines[0][1] == 'Pipfile')):
-                    Exception(str(s_lines))
-            
-                self.run(('git', 'add', 'Pipfile'), print_cmd=True)
-                self.run(('git', 'commit', '-m', 'PKGTOOL update {} to {}'.format(pkg.pkg, v_string)), print_cmd=True)
+        self.modify_pipfile(deps)
+
+        s_lines = list(self.git_status_lines())
+        if s_lines:
+            if not (len(s_lines) == 1):
+                Exception(str(s_lines))
+            if not ((s_lines[0][0] == 'M') and (s_lines[0][1] == 'Pipfile')):
+                Exception(str(s_lines))
+        
+            self.run(('git', 'add', 'Pipfile'), print_cmd=True)
+            self.run(('git', 'commit', '-m', 'PKGTOOL update {} to {}'.format(pkg.pkg, v_string)), print_cmd=True)
 
     def assert_status(self, lines):
         s = set(self.git_status_lines())
@@ -746,9 +686,7 @@ class Package(object):
             self.print_('tests already passed')
             return
 
-        self.dev(args)
-
-        self.run(('pipenv','run','pytest','--maxfail=1','--ff'), stdout=None, stderr=None, print_cmd=True)
+        #self.run(('pipenv','run','pytest','--maxfail=1','--ff'), stdout=None, stderr=None, print_cmd=True)
         self.run(('pipenv','run','py.test','--cov=./'), stdout=None, stderr=None, print_cmd=True)
 
         try:
@@ -831,9 +769,6 @@ def main(argv):
     
     parser.set_defaults(func=help_)
 
-    parser_commit = subparsers.add_parser('commit')
-    parser_commit.set_defaults(func=functools.partial(Package.foreach, Package.commit))
-
     parser_release = subparsers.add_parser('release')
     parser_release.add_argument('--no-upload', action='store_true', dest='no_upload')
     parser_release.add_argument('--no-term', action='store_true', dest='no_term')
@@ -845,13 +780,9 @@ def main(argv):
     parser_version.set_defaults(func=version_)
     
     commands = [
+            ('lock', Package.lock, []),
             ('test', Package.test, []),
-            ('install', Package.do_install, [
-                (('--dev',), {'action':'store_true'}),
-                    ]),
-            ('check_install', Package.do_check_install, [
-                (('--dev',), {'action':'store_true'}),
-                    ]),
+            ('commit', Package.commit, []),
             ]
     
     for s, f, arguments in commands:
