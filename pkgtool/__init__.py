@@ -678,7 +678,7 @@ class Package(object):
         # Create a clean environment based on Pipfile.
         # Modules required for testing should be in dev-packages.
         
-        self.assert_clean()
+        self.clean_working_tree(args)
 
         c = self.get_git_commit_HEAD().decode()
         f = os.path.join(self.d, '.dev', 'test', c)
