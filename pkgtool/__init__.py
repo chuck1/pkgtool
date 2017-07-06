@@ -46,11 +46,18 @@ class Package(object):
         self._path_pipfile_lock = None
         self._pipfile_lock = None
 
+    def lock_pipfile(self):
+        b = (os.path.getmtime(self.path_pipfile) > os.path.getmtime(self.path_pipfile_lock))
+        if b:
+            self.run(('pipenv', 'lock'), print_cmd=True)
+        return b
+
     def lock(self, args):
+        self.lock_pipfile()
+
         if os.path.exists(self.path_setup_lock):
             if os.path.getmtime(self.path_setup_lock) > os.path.getmtime(self.path_setup):
                 return
-            
         with open(self.path_setup) as f:
             s = toml.loads(f.read())
         with open(self.path_setup_lock, 'w') as f:
@@ -119,15 +126,12 @@ class Package(object):
         if not self._path_pipfile_lock:
             self._path_pipfile_lock = os.path.join(self.d, 'Pipfile.lock')
         return self._path_pipfile_lock
+    
 
     @property
     def pipfile_lock(self):
-        b = (os.path.getmtime(self.path_pipfile) > os.path.getmtime(self.path_pipfile_lock))
+        b = self.lock_pipfile()
         if (not self._pipfile_lock) or b:
-            if b:
-                # Pipfile.lock is out of date
-                self.run(('pipenv', 'lock'), print_cmd=True)
-        
             with open(self.path_pipfile_lock) as f:
                 self._pipfile_lock = json.loads(f.read())
 
@@ -410,7 +414,7 @@ class Package(object):
         """
         # exploring alternate method
         pipfile = self.read_pipfile()
-        for k, v in pipfile['dev-packages'].items():
+        for k, v in pipfile.get('dev-packages', {}).items():
             m = re.match('-e (.*)', k)
             if m:
                 if m.group(1) == '.':
@@ -453,8 +457,8 @@ class Package(object):
         for k, v in deps:
             p['packages'][k] = v
         with open(self.path_pipfile, 'w') as f:
-            f.write(toml.dumps())
-        self.run(('pipenv','lock'))
+            f.write(toml.dumps(p))
+        self.run(('pipenv','lock'), print_cmd=True)
         
     def pipenv_install_deps(self, args):
         self.print_('local deps')
@@ -493,17 +497,17 @@ class Package(object):
 
             deps[pkg.name] = spec
 
-        self.modify_pipfile(deps)
+            self.modify_pipfile(deps)
 
-        s_lines = list(self.git_status_lines())
-        if s_lines:
-            if not (len(s_lines) == 1):
-                Exception(str(s_lines))
-            if not ((s_lines[0][0] == 'M') and (s_lines[0][1] == 'Pipfile')):
-                Exception(str(s_lines))
+            s_lines = list(self.git_status_lines())
+            if s_lines:
+                if not (len(s_lines) == 1):
+                    Exception(str(s_lines))
+                if not ((s_lines[0][0] == 'M') and (s_lines[0][1] == 'Pipfile')):
+                    Exception(str(s_lines))
         
-            self.run(('git', 'add', 'Pipfile'), print_cmd=True)
-            self.run(('git', 'commit', '-m', 'PKGTOOL update {} to {}'.format(pkg.pkg, v_string)), print_cmd=True)
+                self.run(('git', 'add', 'Pipfile'), print_cmd=True)
+                self.run(('git', 'commit', '-m', 'PKGTOOL update {} to {}'.format(pkg.pkg, v_string)), print_cmd=True)
 
     def assert_status(self, lines):
         s = set(self.git_status_lines())
@@ -687,7 +691,7 @@ class Package(object):
             return
 
         #self.run(('pipenv','run','pytest','--maxfail=1','--ff'), stdout=None, stderr=None, print_cmd=True)
-        self.run(('pipenv','run','py.test','--cov=./'), stdout=None, stderr=None, print_cmd=True)
+        self.run(('pipenv','run','py.test','--cov=./', '-x', '--ff'), stdout=None, stderr=None, print_cmd=True)
 
         try:
             os.makedirs(os.path.dirname(f))
