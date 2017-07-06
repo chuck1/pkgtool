@@ -45,6 +45,7 @@ class Package(object):
         self._path_pipfile = None
         self._path_pipfile_lock = None
         self._pipfile_lock = None
+        self._executable = None
 
     def lock_pipfile(self):
         b = (os.path.getmtime(self.path_pipfile) > os.path.getmtime(self.path_pipfile_lock))
@@ -699,6 +700,12 @@ class Package(object):
         with open(f, 'w') as fd:
             fd.write(' ')
 
+    @property
+    def executable(self):
+        if self._executable is None:
+            self._executable = os.path.join(self.run(('pipenv','--venv')).stdout.decode().strip(), 'bin', 'python3')
+        return self._executable
+
     def dev(self, args):
         """
         setup dev environment
@@ -713,9 +720,9 @@ class Package(object):
         self.do_install(a)
 
     def docs(self):
-        self.run(('make', '-C', 'docs', 'html'), print_cmd=True)
-        self.run(('make', '-C', 'docs', 'coverage'), print_cmd=True)
-        self.run(('make', '-C', 'docs', 'doctest'), print_cmd=True)
+        self.run((self.executable, '-m', 'sphinx', '-M', 'html', 'docs', 'docs/_build'), stdout=None, stderr=None, print_cmd=True)
+        self.run((self.executable, '-m', 'sphinx', '-M', 'coverage', 'docs', 'docs/_build'), stdout=None, stderr=None, print_cmd=True)
+        self.run((self.executable, '-m', 'sphinx', '-M', 'doctest', 'docs', 'docs/_build'), stdout=None, stderr=None, print_cmd=True)
         d = os.environ.get('LOCAL_DOCS_DIR', None)
         if d:
             self.run(('cp', '-r', 'docs/_build/html', os.path.join(d, self.pkg)))
