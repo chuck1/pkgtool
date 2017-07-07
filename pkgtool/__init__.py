@@ -429,7 +429,7 @@ class Package(object):
     def print_(self, *args):
         print(termcolor.colored('{:<16}'.format(self.pkg), 'white', attrs=['bold']), *args)
 
-    def spec_in_pipfile(self, pipfile, name, sped):
+    def spec_in_pipfile(self, pipfile, name, spec):
         if not 'packages' in pipfile:
             self.print_('Pipfile does not have a \'packages\' attribute')
             return False
@@ -449,13 +449,13 @@ class Package(object):
         if s == spec:
             return True
         else:
-            self.print_('Pipefile entry {} does not match {}'.format(s, spec))
+            self.print_('Pipefile entry {} does not match {}'.format(repr(s), repr(spec)))
             return False
 
     def modify_pipfile(self, deps):
         with open(self.path_pipfile) as f:
             p = toml.loads(f.read())
-        for k, v in deps:
+        for k, v in deps.items():
             p['packages'][k] = v
         with open(self.path_pipfile, 'w') as f:
             f.write(toml.dumps(p))
@@ -464,7 +464,7 @@ class Package(object):
     def pipenv_install_deps(self, args):
         self.print_('local deps')
 
-        deps = {}
+        self.assert_clean()
 
         for pkg in self.gen_local_deps():
 
@@ -473,7 +473,7 @@ class Package(object):
  
             pipfile = self.read_pipfile()
             
-            if self.spec_in_pipfile(pipfile, pkg.pkg, v_string):
+            if self.spec_in_pipfile(pipfile, pkg.name, spec):
                 self.print_('{} already in Pipfile'.format(spec))
                 continue
 
@@ -496,19 +496,26 @@ class Package(object):
                     self.print_(e)
                     raise e
 
+            deps = {}
             deps[pkg.name] = spec
 
             self.modify_pipfile(deps)
 
             s_lines = list(self.git_status_lines())
             if s_lines:
-                if not (len(s_lines) == 1):
-                    Exception(str(s_lines))
-                if not ((s_lines[0][0] == 'M') and (s_lines[0][1] == 'Pipfile')):
-                    Exception(str(s_lines))
-        
                 self.run(('git', 'add', 'Pipfile'), print_cmd=True)
                 self.run(('git', 'commit', '-m', 'PKGTOOL update {} to {}'.format(pkg.pkg, v_string)), print_cmd=True)
+            
+        self.assert_clean()
+        
+        self.lock_pipfile()
+
+        s_lines = list(self.git_status_lines())
+        if s_lines:
+            self.run(('git', 'add', 'Pipfile.lock'), print_cmd=True)
+            self.run(('git', 'commit', '-m', 'PKGTOOL lock'), print_cmd=True)
+
+        self.assert_clean()
 
     def assert_status(self, lines):
         s = set(self.git_status_lines())
@@ -534,76 +541,38 @@ class Package(object):
 
         self.run(('git', 'add', fn0))
 
-        # should we do the prereqs from build_wheel here?
-        self.reset_env_and_test()
-
         self.run(('git', 'commit', '-m', 'PKGTOOL change version from {} to {}'.format(
             v0.to_string(), v.to_string())), print_cmd=True)
         self.run(('git', 'tag', 'v{}'.format(v.to_string())), print_cmd=True)
         self.run(('git', 'push', 'origin', 'v{}'.format(v.to_string())), print_cmd=True)
 
-    def reset_env_and_test(self):
-        # reset virtualenv
-
-        #self.run(('pipenv', '--rm'), print_cmd=True)
-        
-        self.run(('pipenv', '--three'), print_cmd=True)
-        self.run(('pipenv', 'install'), print_cmd=True)
-        self.write_requirements()
-
-        self.run(('git','add','--all'))
-
     def release(self, args):
         """
         Ensure a clean working directory and then ``pipenv install`` the latest version 
         """
-        if self.pkg in VISITED:
-            print('already visted')
-            return
-        VISITED.append(self.pkg)
-        
-        self.print_('pkgtool')
 
-        if not args.get('no_recursion', False):
-            for pkg in self.gen_local_deps():
-                print(termcolor.colored(pkg.pkg, 'blue', attrs=['bold']))
-                pkg.release(args)
+        # steps
+        # make sure working tree is clean
+        self.clean_working_tree(args)
+        self.print_('working tree is clean')
 
-        try:
-            # steps
-            # make sure working tree is clean
-            self.clean_working_tree(args)
-            self.print_('working tree is clean')
-    
-            # pipenv install source versions of dependent project packages
-            self.pipenv_install_deps(args)
-    
-            # if clean, compare to version tag matching version in source
-            if self.compare_ancestor_version():
-                print('this branch is ahead of v{}'.format(self.current_version().to_string()))
-                self.input_version_change(args)
-                self.upload_wheel(args)
+
+        self.test(args)
+
+        # pipenv install source versions of dependent project packages
+        self.pipenv_install_deps(args)
+
+        # if clean, compare to version tag matching version in source
+        if self.compare_ancestor_version():
+            print('this branch is ahead of v{}'.format(self.current_version().to_string()))
+            self.input_version_change(args)
+            self.upload_wheel(args)
             
-            # if not clean or at downstream commit, change version, commit, push, and upload
-        except Exception as e:
-            raise
-            #print(e)
-            #traceback.print_exc()
-            #sys.exit(1)
-
     def commit(self, args):
         # make sure working tree is clean
         self.clean_working_tree(args)
         self.print_('working tree is clean')
     
-    def write_requirements(self):
-        r = self.run(('pipenv', 'run', 'pip3', 'freeze'), print_cmd=True)
-        
-        with open(os.path.join(self.d, 'requirements.txt'), 'wb') as f:
-            for l in r.stdout.split(b'\n'):
-                if b'git+' in l: continue
-                f.write(l+b'\n')
-
     def clear_requirements(self):
         with open(os.path.join(self.d, 'requirements.txt'), 'wb') as f:
             f.write(b'')
@@ -626,8 +595,6 @@ class Package(object):
     def build_wheel(self, args):
         self.assert_head_at_version_tag()
 
-        self.write_requirements()
-        
         shutil.rmtree(os.path.join(self.d, 'build'), ignore_errors=True)
 
         self.run(('python3', 'setup.py', 'bdist_wheel'), print_cmd=True)
@@ -731,9 +698,6 @@ class Package(object):
         c = args.get('command')
         self.run(c, stdout=None, stderr=None, shell=True, print_cmd=True)
 
-    def req(self, args):
-        self.write_requirements()
-
     @staticmethod
     def foreach(f, self, args):
         assert args is not None
@@ -746,9 +710,6 @@ class Package(object):
 
         f(self, args)
     
-def release(pkg, args):
-    pkg.release(args)
-
 def version_(pkg, args):
     print(pkg.current_version().to_string())
     pkg.compare_pipfile_lock_to_freeze(args)
@@ -780,13 +741,6 @@ def main(argv):
     
     parser.set_defaults(func=help_)
 
-    parser_release = subparsers.add_parser('release')
-    parser_release.add_argument('--no-upload', action='store_true', dest='no_upload')
-    parser_release.add_argument('--no-term', action='store_true', dest='no_term')
-    parser_release.add_argument('--no-input', action='store_true', dest='no_input')
-    parser_release.add_argument('--no-recursion', action='store_true', dest='no_recursion')
-    parser_release.set_defaults(func=release)
- 
     parser_version = subparsers.add_parser('version')
     parser_version.set_defaults(func=version_)
     
@@ -794,6 +748,12 @@ def main(argv):
             ('lock', Package.lock, []),
             ('test', Package.test, []),
             ('commit', Package.commit, []),
+            ('release', Package.release, [
+                (('--no_upload',), {'action': 'store_true'}),
+                (('--no_term',), {'action': 'store_true'}),
+                (('--no_input',), {'action': 'store_true'}),
+                (('--no_recursion',), {'action': 'store_true'}),
+                ]),
             ]
     
     for s, f, arguments in commands:
@@ -814,9 +774,6 @@ def main(argv):
 
     parser_docs = subparsers.add_parser('docs')
     parser_docs.set_defaults(func=docs)
-
-    parser_req = subparsers.add_parser('req')
-    parser_req.set_defaults(func=functools.partial(Package.foreach, Package.req))
 
     args = parser.parse_args(argv[1:])
 
