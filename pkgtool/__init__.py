@@ -455,10 +455,16 @@ class Package(object):
     def modify_pipfile(self, deps):
         with open(self.path_pipfile) as f:
             p = toml.loads(f.read())
+        
+        if not 'packages' in p:
+            p['packages'] = {}
+
         for k, v in deps.items():
             p['packages'][k] = v
+
         with open(self.path_pipfile, 'w') as f:
             f.write(toml.dumps(p))
+
         self.run(('pipenv','lock'), print_cmd=True)
         
     def pipenv_install_deps(self, args):
@@ -567,11 +573,16 @@ class Package(object):
             print('this branch is ahead of v{}'.format(self.current_version().to_string()))
             self.input_version_change(args)
             self.upload_wheel(args)
-            
+        
+        self.run(('git','push'), print_cmd=True)
+
     def commit(self, args):
         # make sure working tree is clean
+        if self.is_clean(): return
+
         self.clean_working_tree(args)
         self.print_('working tree is clean')
+        self.run(('git','push'), print_cmd=True)
     
     def clear_requirements(self):
         with open(os.path.join(self.d, 'requirements.txt'), 'wb') as f:
