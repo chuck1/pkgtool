@@ -48,9 +48,18 @@ class Package(object):
         self._executable = None
 
     def lock_pipfile(self):
+        self.assert_clean()
+
         b = (os.path.getmtime(self.path_pipfile) > os.path.getmtime(self.path_pipfile_lock))
         if b:
             self.run(('pipenv', 'lock'), print_cmd=True)
+            
+            if not self.is_clean():
+                self.run(('git', 'add', 'Pipfile.lock'), print_cmd=True)
+                self.run(('git', 'commit', '-m', 'PKGTOOL lock'), print_cmd=True)
+
+        self.assert_clean()
+
         return b
 
     def lock(self, args):
@@ -465,8 +474,6 @@ class Package(object):
         with open(self.path_pipfile, 'w') as f:
             f.write(toml.dumps(p))
 
-        self.run(('pipenv','lock'), print_cmd=True)
-        
     def pipenv_install_deps(self, args):
         self.print_('local deps')
 
@@ -480,7 +487,7 @@ class Package(object):
             pipfile = self.read_pipfile()
             
             if self.spec_in_pipfile(pipfile, pkg.name, spec):
-                self.print_('{} already in Pipfile'.format(spec))
+                self.print_('{}{} already in Pipfile'.format(pkg.name, spec))
                 continue
 
             d2 = os.path.join(pkg.d, 'dist')
@@ -507,21 +514,13 @@ class Package(object):
 
             self.modify_pipfile(deps)
 
-            s_lines = list(self.git_status_lines())
-            if s_lines:
+            if not self.is_clean():
                 self.run(('git', 'add', 'Pipfile'), print_cmd=True)
                 self.run(('git', 'commit', '-m', 'PKGTOOL update {} to {}'.format(pkg.pkg, v_string)), print_cmd=True)
             
-        self.assert_clean()
-        
+            self.assert_clean()
+
         self.lock_pipfile()
-
-        s_lines = list(self.git_status_lines())
-        if s_lines:
-            self.run(('git', 'add', 'Pipfile.lock'), print_cmd=True)
-            self.run(('git', 'commit', '-m', 'PKGTOOL lock'), print_cmd=True)
-
-        self.assert_clean()
 
     def assert_status(self, lines):
         s = set(self.git_status_lines())
