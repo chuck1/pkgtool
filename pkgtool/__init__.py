@@ -467,8 +467,9 @@ class Package(object):
         
         if not 'packages' in p:
             p['packages'] = {}
-
+        
         for k, v in deps.items():
+            k = k.replace('_','-')
             p['packages'][k] = v
 
         with open(self.path_pipfile, 'w') as f:
