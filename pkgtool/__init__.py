@@ -431,7 +431,12 @@ class Package(object):
                     continue
 
                 d = os.path.normpath(os.path.join(self.d, m.group(1)))
-                pkg = Package(d)
+                
+                try:
+                    pkg = Package(d)
+                except:
+                    continue
+                
                 pkg.current_version()
                 yield pkg
         
@@ -607,8 +612,9 @@ class Package(object):
         self.assert_head_at_version_tag()
 
         shutil.rmtree(os.path.join(self.d, 'build'), ignore_errors=True)
-
-        self.run(('python3', 'setup.py', 'bdist_wheel'), print_cmd=True)
+        
+        # TODO have config option for python version and build all necessary wheels
+        self.run(('python3', 'setup.py', 'bdist_wheel', '--python-tag', 'py36'), print_cmd=True)
         
     def upload_wheel(self, args):
         self.build_wheel(args)
