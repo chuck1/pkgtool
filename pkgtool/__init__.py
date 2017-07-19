@@ -14,6 +14,7 @@ import traceback
 from pprint import pprint
 import shutil
 
+from cached_property import cached_property
 import termcolor
 import toml
 
@@ -47,13 +48,34 @@ class Package(object):
         self._pipfile_lock = None
         self._executable = None
 
+    def install_requires(self):
+        p = self.pipfile_lock
+        for k, v in p['default'].items():
+            if isinstance(v, str):
+                yield k + v
+            else:
+                yield k + v['version'] 
+        
+    def write_requires(self):
+        b = (os.path.getmtime(self.path_pipfile) > os.path.getmtime(self.path_requirements))
+        if b:
+            s = '\n'.join(self.install_requires())
+            with open(os.path.join(self.d, 'requirements.txt'), 'w') as f:
+                f.write(s)
+
+            if not self.is_clean():
+                self.run(('git', 'add', 'requirements.txt'), print_cmd=True)
+                self.run(('git', 'commit', '-m', 'PKGTOOL lock'), print_cmd=True)
+
+        self.assert_clean()
+
     def lock_pipfile(self):
         self.assert_clean()
 
         b = (os.path.getmtime(self.path_pipfile) > os.path.getmtime(self.path_pipfile_lock))
         if b:
             self.run(('pipenv', 'lock'), print_cmd=True)
-            
+ 
             if not self.is_clean():
                 self.run(('git', 'add', 'Pipfile.lock'), print_cmd=True)
                 self.run(('git', 'commit', '-m', 'PKGTOOL lock'), print_cmd=True)
@@ -65,6 +87,8 @@ class Package(object):
     def lock(self, args):
         self.lock_pipfile()
 
+        self.write_requires()
+
         if os.path.exists(self.path_setup_lock):
             if os.path.getmtime(self.path_setup_lock) > os.path.getmtime(self.path_setup):
                 return
@@ -72,6 +96,11 @@ class Package(object):
             s = toml.loads(f.read())
         with open(self.path_setup_lock, 'w') as f:
             f.write(json.dumps(s, indent=4))
+        
+        self.run(('git', 'add', 'Setup.lock'), print_cmd=True)
+        self.run(('git', 'commit', '-m', 'PKGTOOL lock setup'), print_cmd=True)
+       
+        self.assert_clean()
 
     def run(self, args, cwd=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False, dry_run=False,
             shell=False):
@@ -119,17 +148,17 @@ class Package(object):
             self._path_setup = os.path.join(self.d, 'Pytool')
         return self._path_setup
 
-    @property
-    def path_setup_lock(self):
-        if not self._path_setup_lock:
-            self._path_setup_lock = os.path.join(self.d, 'Setup.lock')
-        return self._path_setup_lock
+    @cached_property
+    def path_requirements(self):
+        return os.path.join(self.d, 'requirements.txt')
 
-    @property
+    @cached_property
+    def path_setup_lock(self):
+        return os.path.join(self.d, 'Setup.lock')
+
+    @cached_property
     def path_pipfile(self):
-        if not self._path_pipfile:
-            self._path_pipfile = os.path.join(self.d, 'Pipfile')
-        return self._path_pipfile
+        return os.path.join(self.d, 'Pipfile')
 
     @property
     def path_pipfile_lock(self):
@@ -567,11 +596,14 @@ class Package(object):
         self.clean_working_tree(args)
         self.print_('working tree is clean')
 
-
         self.test(args)
-
+        
         # pipenv install source versions of dependent project packages
         self.pipenv_install_deps(args)
+        
+        self.lock(args)
+        
+        self.assert_clean()
 
         # if clean, compare to version tag matching version in source
         if self.compare_ancestor_version():
@@ -602,7 +634,7 @@ class Package(object):
 
     def wheel_filename(self):
         s = self.current_version().to_string()
-        return self.pkg + '-' + s + '-py3-none-any.whl'
+        return self.pkg + '-' + s + '-py36-none-any.whl'
 
     def auto_commit(self, m):
         self.run(('git','add','--all'), print_cmd=True)
@@ -615,15 +647,18 @@ class Package(object):
         
         # TODO have config option for python version and build all necessary wheels
         self.run(('python3', 'setup.py', 'bdist_wheel', '--python-tag', 'py36'), print_cmd=True)
+        self.run(('python3', 'setup.py', 'sdist'), print_cmd=True)
         
     def upload_wheel(self, args):
         self.build_wheel(args)
 
         s = self.current_version().to_string()
         
-        wf1 = self.pkg + '-' + s + '-py3-none-any.whl'
-        wf2 = self.pkg.replace('-','_') + '-' + s + '-py3-none-any.whl'
-        
+        wf1 = self.pkg + '-' + s + '-py36-none-any.whl'
+        wf2 = self.pkg.replace('-','_') + '-' + s + '-py36-none-any.whl'
+
+        tar_file = self.pkg + '-' + s + '.tar.gz'
+
         if os.path.exists(os.path.join(self.d, 'dist', wf1)):
             wf = wf1
         elif os.path.exists(os.path.join(self.d, 'dist', wf2)):
@@ -632,6 +667,7 @@ class Package(object):
             raise Exception()
         
         self.run(('twine', 'upload', os.path.join('dist', wf)), print_cmd=True, dry_run=args.get('no_upload', False))
+        self.run(('twine', 'upload', os.path.join('dist', tar_file)), print_cmd=True, dry_run=args.get('no_upload', False))
 
     def read_config(self):
         with open(os.path.join(self.d, 'Pytool')) as f:
