@@ -1,5 +1,8 @@
 __version__ = '0.1b55'
 
+import sys
+from pprint import pprint
+import toml
 import argparse
 import curses
 import enum
@@ -26,6 +29,14 @@ VISITED = []
 
 def commented_lines(b):
     return [b'# ' + l for l in b.split(b'\n')]
+
+def clean(f):
+    def wrapped(self, *args, **kwargs):
+        self.assert_clean()
+        ret = f(self, *args, **kwargs)
+        self.assert_clean()
+        return ret
+    return wrapped
 
 class Package(object):
     """
@@ -56,38 +67,53 @@ class Package(object):
             else:
                 yield k + v['version'] 
         
-    def write_requires(self):
-        b = (os.path.getmtime(self.path_pipfile) > os.path.getmtime(self.path_requirements))
+    def write_requires(self, args, force=False):
+        if os.path.exists(self.path_requirements):
+            b = (os.path.getmtime(self.path_pipfile) > os.path.getmtime(self.path_requirements))
+        else:
+            b = True
+        
+        b = b or force
         if b:
             s = '\n'.join(self.install_requires())
             with open(os.path.join(self.d, 'requirements.txt'), 'w') as f:
                 f.write(s)
 
+        return b
+
+    def write_requires_and_commit(self, args):
+        self.assert_clean()
+
+        b = self.write_requires(args)
+
+        if b:
             if not self.is_clean():
                 self.run(('git', 'add', 'requirements.txt'), print_cmd=True)
                 self.run(('git', 'commit', '-m', 'PKGTOOL lock'), print_cmd=True)
 
         self.assert_clean()
 
-    def lock_pipfile(self):
-        self.assert_clean()
-
+    def _lock_pipfile(self, force=False):
         b = (os.path.getmtime(self.path_pipfile) > os.path.getmtime(self.path_pipfile_lock))
+        b = b or force
         if b:
             self.run(('pipenv', 'lock'), print_cmd=True)
- 
+        return b
+
+    @clean
+    def lock_pipfile(self):
+        b = self._lock_pipfile()
+        if b:
             if not self.is_clean():
                 self.run(('git', 'add', 'Pipfile.lock'), print_cmd=True)
                 self.run(('git', 'commit', '-m', 'PKGTOOL lock'), print_cmd=True)
-
-        self.assert_clean()
 
         return b
 
     def lock(self, args):
         self.lock_pipfile()
 
-        self.write_requires()
+        self.write_requires_and_commit(args)
 
         if os.path.exists(self.path_setup_lock):
             if os.path.getmtime(self.path_setup_lock) > os.path.getmtime(self.path_setup):
@@ -101,6 +127,60 @@ class Package(object):
         self.run(('git', 'commit', '-m', 'PKGTOOL lock setup'), print_cmd=True)
        
         self.assert_clean()
+
+    def pyup_post(self, args):
+
+        pipfile = self.pipfile
+
+        p = pipfile['packages']
+        
+        print('pipfile:')
+        pprint(p)
+        print()
+        
+        shutil.copyfile(self.path_requirements, self.path_requirements_pyup)
+        
+        r0 = dict(self.requirements_pyup)
+        
+        print('pyup:')
+        pprint(r0)
+        print()
+
+        input('press enter to coninute')
+        
+        differ=False
+        for k, v in r0.items():
+            if k in p:
+                pv = p[k]
+                if pv.startswith('=='):
+                    if pv != v:
+                        print('versions differ',k,pv,v)
+                        p[k] = v
+                        differ=True
+        
+        if differ:
+            print('new pipfile:')
+            pprint(pipfile)
+        
+            s = toml.dumps(pipfile)
+        
+            with open('Pipfile', 'w') as f:
+                f.write(s)
+        
+        # check new cooked requirements agains requirements_pyup
+        self._lock_pipfile(True)
+
+        self.write_requires(args, True)
+        
+        r1 = dict(self.requirements)
+        
+        for k, v in r0.items():
+            if k in r1:
+                v1 = r1[k]
+                if v1.startswith('=='):
+                    if v1 != v:
+                        print('versions differ',k,v1,v)
+        
 
     def run(self, args, cwd=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE, print_cmd=False, dry_run=False,
             shell=False):
@@ -153,6 +233,10 @@ class Package(object):
         return os.path.join(self.d, 'requirements.txt')
 
     @cached_property
+    def path_requirements_pyup(self):
+        return os.path.join(self.d, 'requirements_pyup.txt')
+
+    @cached_property
     def path_setup_lock(self):
         return os.path.join(self.d, 'Setup.lock')
 
@@ -166,24 +250,40 @@ class Package(object):
             self._path_pipfile_lock = os.path.join(self.d, 'Pipfile.lock')
         return self._path_pipfile_lock
     
+    @property
+    def pipfile(self):
+        with open(self.path_pipfile) as f:
+            p = toml.loads(f.read())
+
+        return p
 
     @property
     def pipfile_lock(self):
-        b = self.lock_pipfile()
+        b = self._lock_pipfile()
         if (not self._pipfile_lock) or b:
             with open(self.path_pipfile_lock) as f:
                 self._pipfile_lock = json.loads(f.read())
 
         return self._pipfile_lock
 
-    @property
-    def requirements_setup(self):
-        with open(os.path.join(self.d, 'requirements_setup.txt')) as f:
-            lst = f.read().split('\n')
+    def _read_req_file(self, path):
+        with open(path) as f:
+            s = f.read()
+
+        lst = s.strip().split('\n')
+
         for l in lst:
             if not l: continue
             m = re.match('^([\w-]+)(.*)$', l)
             yield m.group(1).lower(), m.group(2)
+
+    @property
+    def requirements(self):
+        yield from self._read_req_file(os.path.join(self.d, 'requirements.txt'))
+     
+    @property
+    def requirements_pyup(self):
+        yield from self._read_req_file(os.path.join(self.d, 'requirements_pyup.txt'))
     
     def pipenv_run(self, cmd, *args, **kwargs):
         self.run(('pipenv', 'run') + cmd, *args, **kwargs)
@@ -798,6 +898,8 @@ def main(argv):
     parser_version.set_defaults(func=version_)
     
     commands = [
+            ('write_requires', Package.write_requires, []),
+            ('pyup_post', Package.pyup_post, []),
             ('lock', Package.lock, []),
             ('test', Package.test, []),
             ('commit', Package.commit, []),
@@ -840,5 +942,7 @@ def main(argv):
         raise
         sys.exit(1)
     
+
+
 
 
