@@ -59,13 +59,28 @@ class Package(object):
         self._pipfile_lock = None
         self._executable = None
 
-    def install_requires(self):
+    def requirements(self):
         p = self.pipfile_lock
         for k, v in p['default'].items():
-            if isinstance(v, str):
-                yield k + v
+            if k.startswith('-e'):
+                yield k
             else:
-                yield k + v['version'] 
+                if isinstance(v, str):
+                    yield k + v
+                else:
+                    yield k + v['version'] 
+        
+    def requirements_dev(self):
+        p = self.pipfile_lock
+        yield from self.requirements()
+        for k, v in p['develop'].items():
+            if k.startswith('-e'):
+                yield k
+            else:
+                if isinstance(v, str):
+                    yield k + v
+                else:
+                    yield k + v['version'] 
         
     def write_requires(self, args, force=False):
         if os.path.exists(self.path_requirements):
@@ -75,8 +90,22 @@ class Package(object):
         
         b = b or force
         if b:
-            s = '\n'.join(self.install_requires())
+            s = '\n'.join(self.requirements())
             with open(os.path.join(self.d, 'requirements.txt'), 'w') as f:
+                f.write(s)
+
+        return b
+
+    def write_requirements_dev(self, args, force=False):
+        if os.path.exists(self.path_requirements_dev):
+            b = (os.path.getmtime(self.path_pipfile) > os.path.getmtime(self.path_requirements))
+        else:
+            b = True
+        
+        b = b or force
+        if b:
+            s = '\n'.join(self.requirements_dev())
+            with open(self.path_requirements_dev, 'w') as f:
                 f.write(s)
 
         return b
@@ -84,10 +113,12 @@ class Package(object):
     def write_requires_and_commit(self, args):
         self.assert_clean()
 
+        b = self.write_requirements_dev(args)
         b = self.write_requires(args)
 
         if b:
             if not self.is_clean():
+                self.run(('git', 'add', 'requirements_dev.txt'), print_cmd=True)
                 self.run(('git', 'add', 'requirements.txt'), print_cmd=True)
                 self.run(('git', 'commit', '-m', 'PKGTOOL lock'), print_cmd=True)
 
@@ -140,7 +171,7 @@ class Package(object):
         
         shutil.copyfile(self.path_requirements, self.path_requirements_pyup)
         
-        r0 = dict(self.requirements_pyup)
+        r0 = dict(self.read_requirements_pyup())
         
         print('pyup:')
         pprint(r0)
@@ -172,7 +203,7 @@ class Package(object):
 
         self.write_requires(args, True)
         
-        r1 = dict(self.requirements)
+        r1 = dict(self.read_requirements())
         
         for k, v in r0.items():
             if k in r1:
@@ -233,6 +264,10 @@ class Package(object):
         return os.path.join(self.d, 'requirements.txt')
 
     @cached_property
+    def path_requirements_dev(self):
+        return os.path.join(self.d, 'requirements_dev.txt')
+
+    @cached_property
     def path_requirements_pyup(self):
         return os.path.join(self.d, 'requirements_pyup.txt')
 
@@ -277,12 +312,10 @@ class Package(object):
             m = re.match('^([\w-]+)(.*)$', l)
             yield m.group(1).lower(), m.group(2)
 
-    @property
-    def requirements(self):
+    def reax_requirements(self):
         yield from self._read_req_file(os.path.join(self.d, 'requirements.txt'))
      
-    @property
-    def requirements_pyup(self):
+    def read_requirements_pyup(self):
         yield from self._read_req_file(os.path.join(self.d, 'requirements_pyup.txt'))
     
     def pipenv_run(self, cmd, *args, **kwargs):
@@ -774,31 +807,6 @@ class Package(object):
             c = toml.loads(f.read())
         return c
 
-    def setup_args(self):
-        c = self.read_config()
-        
-        with open(os.path.join(self.d, c['name'], '__init__.py')) as f:
-            version = re.findall("^__version__ = '(.*)'", f.read())[0]
-        
-        with open(os.path.join(self.d, 'requirements.txt')) as f:
-            install_requires=[l.strip() for l in f.readlines()]
-    
-        kwargs = {
-                'name': c['name'],
-                'version': version,
-                'description': c['description'],
-                'url': c['url'],
-                'author': c['author'],
-                'author_email': c['author_email'],
-                'license': c['license'],
-                'packages': c.get('packages', []),
-                'zip_safe': False,
-                'scripts': c.get('scripts',[]),
-                'package_data': c.get('package_data',{}),
-                'install_requires': install_requires,}
-        
-        return kwargs
-    
     def test(self, args):
         # Create a clean environment based on Pipfile.
         # Modules required for testing should be in dev-packages.
