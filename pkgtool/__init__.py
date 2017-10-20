@@ -4,7 +4,6 @@ import sys
 from pprint import pprint
 import toml
 import argparse
-import curses
 import enum
 import functools
 import json
@@ -58,6 +57,27 @@ class Package(object):
         self._path_pipfile_lock = None
         self._pipfile_lock = None
         self._executable = None
+
+    class FileStatus(object):
+        class Type(enum.Enum):
+            MODIFIED = 0
+            DELETED = 1
+            UNTRACKED = 2
+    
+        def __init__(self, pkg, type_, staged, filename):
+            self.pkg = pkg
+            self.type_ = type_
+            self.staged = staged
+            self.filename = filename
+        
+        def toggle_stage(self):
+            if self.staged:
+                self.pkg.run(('git','reset','HEAD',self.filename))
+                self.staged = False
+            else:
+                self.pkg.run(('git','add',self.filename))
+                self.staged = True
+    
 
     def requirements(self):
         p = self.pipfile_lock
@@ -376,124 +396,9 @@ class Package(object):
                     self.print_('unhandled code: {}'.format(repr(m.group(1))))
                     raise Exception('unhandled code: {}'.format(repr(m.group(1))))
 
-    class FileStatus(object):
-        class Type(enum.Enum):
-            MODIFIED = 0
-            DELETED = 1
-            UNTRACKED = 2
-
-        def __init__(self, pkg, type_, staged, filename):
-            self.pkg = pkg
-            self.type_ = type_
-            self.staged = staged
-            self.filename = filename
-        
-        def toggle_stage(self):
-            if self.staged:
-                self.pkg.run(('git','reset','HEAD',self.filename))
-                self.staged = False
-            else:
-                self.pkg.run(('git','add',self.filename))
-                self.staged = True
-
-        def addstr(self, stdscr, i):
-            if self.staged:
-                attr = curses.A_BOLD
-            else:
-                attr = 0
-            stdscr.addstr(i, 2, '{:8} {}'.format(self.type_.name, self.filename), attr)
-
     def gen_file_status(self):
         for code, staged, fn in self.git_status_lines():
             yield Package.FileStatus(self, code, staged, fn)
-
-    def git_terminal(self):
-        
-        def main(stdscr):
-            curses.curs_set(0)
-            # Clear screen
-            
-
-            files = list(self.gen_file_status())
-            if not files:
-                curses.endwin()
-                return
-            
-            w1 = curses.newwin(len(files), 100, 3, 0)
-            
-            cursor = 0
-            
-            def draw():
-                stdscr.clear()
-                
-                # pacakge info
-                stdscr.addstr(0, 0, self.pkg)
-
-                # This raises ZeroDivisionError when i == 10.
-                for i, f in zip(range(len(files)), files):
-                    f.addstr(w1, i)
-            
-                w1.addstr(cursor, 0, '>', curses.A_STANDOUT)
-        
-                stdscr.refresh()
-                w1.refresh()
-        
-            draw()
-
-            while True:
-                c = stdscr.getch()
-
-                if c == curses.KEY_UP or c == 65:
-                    w1.addstr(cursor, 0, ' ')
-                    cursor = (cursor + 1) % len(files)
-                    w1.addstr(cursor, 0, '>', curses.A_STANDOUT)
-                elif c == curses.KEY_DOWN or c == 66:
-                    w1.addstr(cursor, 0, ' ')
-                    cursor = (cursor - 1 + len(files)) % len(files)
-                    w1.addstr(cursor, 0, '>', curses.A_STANDOUT)
-                elif c == 10:
-                    f = files[cursor]
-                    f.toggle_stage()
-                    f.addstr(w1, cursor)
-                elif c == ord('c'):
-                    # commit
-                    cnt = sum(1 for f in files if f.staged)
-                    if cnt == 0:
-                        stdscr.addstr(11, 0, 'nothing is staged', curses.A_STANDOUT)
-                        continue
-                    
-                    curses.endwin()
-                    self.do_commit(f for f in files if f.staged)
-                    files = list(self.gen_file_status())
-                    if not files:
-                        curses.endwin()
-                        break
-                    draw()
-                elif c == ord('d'):
-                    # diff
-                    f = files[cursor]
-
-                    if not f.type_ == Package.FileStatus.Type.MODIFIED:
-                        continue
-
-                    curses.endwin()
-                    r = self.run(('git','diff','HEAD',f.filename))
-                    with tempfile.NamedTemporaryFile() as tf:
-                        tf.write(r.stdout)
-                        tf.flush()
-                        subprocess.run(('less',tf.name))
-
-                    draw()
-                elif c == 27:
-                    curses.endwin()
-                    break
-                else:
-                    stdscr.addstr(10, 0, 'you pressed {}'.format(c), curses.A_STANDOUT)
-
-                w1.refresh()
-                stdscr.refresh()
-        
-        curses.wrapper(main)
 
     def do_commit(self, files):
         with tempfile.NamedTemporaryFile() as tf:
@@ -521,12 +426,6 @@ class Package(object):
             raise AssertionError()
 
     def clean_working_tree(self, args):
-        if args.get('no_term', False):
-            self.auto_commit('PKGTOOL auto commit all')
-        else:
-            if not self.is_clean():
-                self.git_terminal()
-        
         self.assert_clean()
     
     def is_clean(self):
